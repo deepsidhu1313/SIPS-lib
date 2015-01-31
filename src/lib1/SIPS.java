@@ -155,7 +155,7 @@ public class SIPS {
                 s.connect(new InetSocketAddress(HOST, 13131));
                 OutputStream os = s.getOutputStream();
                 DataOutputStream outToServer = new DataOutputStream(os);
-                String sendmsg = "<Command>resolveObject</Command>"
+                String sendmsg = "<Command>breakLoop</Command>"
                         + "<Body><PID>" + ID + "</PID>"
                         + "<CNO>" + CNO + "</CNO>"
                         + "</Body>";
