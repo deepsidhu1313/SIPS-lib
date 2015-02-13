@@ -180,6 +180,12 @@ public class SIPS {
     
 
 }
+    public void FragementHeader(int i){
+    
+    }
+    public void FragementFoot(int i){
+    
+    }
     
     public Object resolveObject(String objectname, int Instancenumber) {
         Object value = null;
