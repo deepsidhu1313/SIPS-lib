@@ -14,7 +14,7 @@ import lib1.SIPS;
 public class LinearSearch {
 
     public static void main(String[] args) {
-        SIPS sim = new SIPS();
+        SIPS sim = new SIPS("LinearSearch");
         int i[] = new int[1000000];
         int number = 83;
         for (int r = 0; r < i.length; r++) {

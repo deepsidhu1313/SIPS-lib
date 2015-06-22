@@ -37,12 +37,13 @@ public class Lib1 {
     public Lib1(int mode, String file) {
 
         System.out.println(OS);
-
+        System.out.println(file);
         if (isWindows()) {
             System.out.println("This is Windows");
             OS_Name = 0;
-            dbloc = file.substring(0, file.lastIndexOf("\\") + 1);
-            dbloc += "parsing.db";
+            
+            dbloc = file.substring(0, file.lastIndexOf("."));
+            dbloc += "-parsing.db";
 
         } else if (isMac()) {
             System.out.println("This is Mac");
@@ -51,8 +52,10 @@ public class Lib1 {
             System.out.println("This is Unix or Linux");
 
             OS_Name = 2;
-            dbloc = file.substring(0, file.lastIndexOf("/"));
-            dbloc += "parsing.db";
+            if (file.contains("/")) {
+                dbloc = file.substring(0, file.lastIndexOf("."));
+            }
+            dbloc += "-parsing.db";
 
         } else if (isSolaris()) {
             System.out.println("This is Solaris");
@@ -106,7 +109,6 @@ public class Lib1 {
 
                 }
 
-                
             }
             rs.close();
             db.closeConnection();

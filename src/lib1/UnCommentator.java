@@ -40,14 +40,14 @@ public class UnCommentator {
                 // count lines
                 lines += 1;
                 if (lines == startline) {
-                    cursor = "" + cursor.replace("/*", "");
+                    cursor = "" + cursor.replace("/*", "  ");
                 }
                 if (lines == endline) {
-                    cursor = "" + cursor.replace("*/", "");
+                    cursor =  cursor.replace("*/", "  ");
                     
                 }
                 
-                if ((cursor.contains("saveDValues"))||(cursor.contains("saveDObjects"))) {
+                if ((cursor.contains("saveDValues"))||(cursor.contains("saveDObject"))) {
                     cursor = "//" + cursor.substring(0);
                     
                 }

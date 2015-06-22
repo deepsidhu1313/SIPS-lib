@@ -53,10 +53,10 @@ public class Commentator {
                 }
                 else if (body) {
                     if (cursor.contains("/*")) {
-                        cursor = "" + cursor.replace("/*", "");
+                        cursor = cursor.replace("/*", "  ");
                     }
                     if (cursor.contains("*/")) {
-                        cursor = "" + cursor.replace("*/", "");
+                        cursor = cursor.replace("*/", "  ");
 
                     }
                 }

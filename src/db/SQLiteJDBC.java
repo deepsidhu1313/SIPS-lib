@@ -9,6 +9,7 @@ package db;
  *
  * @author Nika
  */
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
@@ -16,10 +17,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,7 +37,7 @@ public class SQLiteJDBC {
     public SQLiteJDBC() {
     }
 
-    public void closeConnection()  {
+    public void closeConnection() {
         try {
             stmt.close();
             c.close();
@@ -128,22 +133,22 @@ public class SQLiteJDBC {
 
     }
 
-    public void Update(String db, String sql, Object obj)  {
+    public void Update(String db, String sql, Object obj) {
         try {
             Class.forName("org.sqlite.JDBC");
             c = DriverManager.getConnection("jdbc:sqlite:" + db);
             c.setAutoCommit(false);
             PreparedStatement ps = null;
 
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(bos);
-
-            oos.writeObject(obj);
-            oos.flush();
-            oos.close();
-            bos.close();
-
-            byte[] data = bos.toByteArray();
+            byte[] data;
+            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+                try (ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(bos))) {
+                    oos.writeObject(obj);
+                    oos.reset();
+                    oos.flush();
+                }
+                data = bos.toByteArray();
+            }
 
 //            sql = "insert into javaobject (javaObject) values(?)";
             ps = c.prepareStatement(sql);
@@ -163,43 +168,43 @@ public class SQLiteJDBC {
 
     }
 
-    public Object getObject(String db, String sql)  {
+    public Object getObject(String db, String sql) {
         Object rmObj = null;
-            try {
+        try {
             Class.forName("org.sqlite.JDBC");
             c = DriverManager.getConnection("jdbc:sqlite:" + db);
             c.setAutoCommit(false);
             PreparedStatement ps = null;
             ResultSet rs = null;
             //String sql=null;
-            
+
             //sql="select * from javaobject where id=1";
             ps = c.prepareStatement(sql);
-            
+
             rs = ps.executeQuery();
-            
+
             if (rs.next()) {
                 ByteArrayInputStream bais;
-                
+
                 ObjectInputStream ins;
-                
+
                 try {
-                    
+
                     bais = new ByteArrayInputStream(rs.getBytes("VALUE"));
-                    
+
                     ins = new ObjectInputStream(bais);
-                    
+
                     ArrayList mc = (ArrayList) ins.readObject();
-                    
+
                     System.out.println("Object in value ::" + mc);
                     ins.close();
-                    
+
                     rmObj = mc;
                 } catch (Exception e) {
-                    
+
                     e.printStackTrace();
                 }
-                
+
             }
 
             return rmObj;
