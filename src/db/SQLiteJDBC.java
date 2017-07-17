@@ -100,8 +100,8 @@ public class SQLiteJDBC {
 
             stmt = c.createStatement();
             rs2 = stmt.executeQuery(sql);
-            System.out.println(sql);
-            System.out.println("Select Operation done successfully on DB " + db);
+//            System.out.println(sql);
+//            System.out.println("Select Operation done successfully on DB " + db);
         } catch (ClassNotFoundException | SQLException e) {
             System.err.println(e.getClass().getName() + ": " + e.getMessage());
             System.err.println("Select Operation was not done successfully on DB " + db);

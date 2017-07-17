@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.ResultSet;
@@ -31,7 +32,7 @@ import util.tools;
  *
  * @author Navdeep Singh <navdeepsingh.sidhu95 at gmail.com>
  */
-public class SIPS {
+public class SIPS implements Serializable {
 
     public SQLiteJDBC db = new SQLiteJDBC();
     public SQLiteJDBC db2 = new SQLiteJDBC();
@@ -257,7 +258,7 @@ public class SIPS {
                             + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
                             + "<OBJECT>" + objectname + "</OBJECT>"
                             + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
-                    
+
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
@@ -308,8 +309,8 @@ public class SIPS {
 
             while (Ndownloaded) {
                 String nmsg = "";
-                if (new File(ip2Dir.getAbsolutePath()+".sha").exists()) {
-                    lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath()+".sha" );
+                if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                    lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
                 }
                 if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                     util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
@@ -343,11 +344,11 @@ public class SIPS {
                                     // receive file
 
                                     sock.close();
-                                    if (new File(ip2Dir.getAbsolutePath()+".sha").exists()) {
+                                    if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                                         lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
                                     }
                                     if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
-                                        util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(),path);
+                                        util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
                                         Ndownloaded = false;
                                     }
 
@@ -373,27 +374,27 @@ public class SIPS {
             }
 
             /*New Logic While wala*/
-                long endTime = System.currentTimeMillis();
-            
-                Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, ID, CNO, "", "" + (endTime - starttime)));
-                t2.start();
-             //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
-              //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
-        try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
+            long endTime = System.currentTimeMillis();
 
-            //   Mobile m1 = (Mobile) ois.readObject();
-            value = ois.readObject();
-            // value = m1.getNumber();
-        }   catch (FileNotFoundException ex) {
+            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, ID, CNO, "", "" + (endTime - starttime)));
+            t2.start();
+            //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
+            //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
+            try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
+
+                //   Mobile m1 = (Mobile) ois.readObject();
+                value = ois.readObject();
+                // value = m1.getNumber();
+            } catch (FileNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException | ClassNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-            }     }
+            }
+        }
         return value;
-    
+
     }
-       
-    
+
     /*public Object resolveObject(String objectname, int Instancenumber) {
      Object value = null;
      Socket s = null;
@@ -444,7 +445,6 @@ public class SIPS {
      }
      return value;
      }*/
-
     public void saveArrayElement(Object obj, String objectname, String position, int Instancenumber) {
         Object value = null;
         // = null;
@@ -476,17 +476,13 @@ public class SIPS {
                         outToServer.write(bytes);
                         ObjectOutputStream outStream = new ObjectOutputStream(os);
                         outStream.writeObject(obj);
-                    
 
-
-
-}
+                    }
                 }
 
             } catch (IOException ex) {
-                Logger.getLogger(SIPS.class  
-
-.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
 
             }
 
@@ -533,28 +529,19 @@ public class SIPS {
                 }
                 inStream.close();
                 s.close();
-            
 
+            } catch (IOException ex) {
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
 
-
-} catch (IOException ex) {
-                Logger.getLogger(SIPS.class  
-
-    .getName()).log(Level.SEVERE, null, ex);
-    
-    
-        try {
+                try {
                     s.close();
-    }
-    catch (IOException ex1
-
-    
-        ) {
+                } catch (IOException ex1) {
                     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
-    }
-}
+                }
+            }
 
-}
+        }
     }
 
     public Object resolveArrayElement(String objectname, String position, int Instancenumber) {
@@ -592,33 +579,19 @@ public class SIPS {
                 s.close();
                 outToServer.close();
                 inStream.close();
-            
 
+            } catch (IOException ex) {
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
 
-
-} catch (IOException ex) {
-                Logger.getLogger(SIPS.class  
-
-    .getName()).log(Level.SEVERE, null, ex);
-    
-    
-        try {
+                try {
                     s.close();
-    }
-    catch (IOException ex1
-
-    
-        ) {
+                } catch (IOException ex1) {
                     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
-    }
-}
-
-
-
-catch (ClassNotFoundException ex) {
-                Logger.getLogger(SIPS.class  
-
-.getName()).log(Level.SEVERE, null, ex);
+                }
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
 
         }
