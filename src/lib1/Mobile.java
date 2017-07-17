@@ -16,14 +16,24 @@
  */
 package lib1;
 
+import java.io.Serializable;
+
 /**
  * 
- * @author Navdeep Singh <navdeepsingh.sidhu95 at gmail.com>
+ * @author NAVDEEP SINGH SIDHU <navdeepsingh.sidhu95@gmail.com>
  */
-public class Interpreter {
-
-    public Interpreter() {
-
+ class Mobile implements Serializable{
+     
+    private Object number;
+     
+    public Mobile(Object num){
+        this.number = num;
     }
-
+     
+    public Object getNumber() {
+        return number;
+    }
+    public void setNumber(Object number) {
+        this.number = number;
+    }
 }
