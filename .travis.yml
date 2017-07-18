@@ -1,0 +1,32 @@
+language: java
+dist: xenial
+jdk:
+  - openjdk8
+
+os:
+  - linux
+
+# enable Java 8u45+, see https://github.com/travis-ci/travis-ci/issues/4042
+#addons:
+#  apt:
+#    packages:
+#      - oracle-java8-installer
+before_install:
+#  - sudo add-apt-repository ppa:openjdk-r/ppa -y
+  - sudo apt-get -qq update
+  - sudo apt-get install -y openjdk-8-jdk
+  - sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+  - mkdir build
+sudo: required
+
+# run in container
+#sudo: false
+
+# use framebuffer for UI 
+#before_install:
+#  - export DISPLAY=:99.0
+#  - sh -e /etc/init.d/xvfb start
+
+
+script:
+  - ant -Dplatforms.openjdk8.home=/usr/lib/jvm/java-8-openjdk-amd64 -buildfile travis-build.xml

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="compile" basedir="." name="SIPS-Node">
+  <!--this file was created by Eclipse Runnable JAR Export Wizard-->
+  <!--ANT 1.7 is required                                        -->
+
+  <target name="compile">
+    <javac srcdir="src" destdir="build" includes="**/*.java" target="1.8">
+
+        <classpath refid="classpath.base" />
+    </javac>
+
+  </target>
+<!-- Libraries on which your code depends -->
+  <path id="classpath.base">                                                                                                                           
+     <fileset dir="lib">                                                                                                                          
+         <include name="**/*.jar" />                                                                                                          
+     </fileset>
+</path>  
+</project>
