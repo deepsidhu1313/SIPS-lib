@@ -37,20 +37,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import org.json.JSONObject;
 import util.tools;
 
-/**
- *
- * @author Navdeep Singh <navdeepsingh.sidhu95 at gmail.com>
- */
 public class SIPS implements Serializable {
 
     public SQLiteJDBC db = new SQLiteJDBC();
     public SQLiteJDBC db2 = new SQLiteJDBC();
     public SQLiteJDBC db3 = new SQLiteJDBC();
     public ArrayList checkpoint = new ArrayList();
-    int valcounter = 0, objcounter = 0;
-    String dbloc = "", dbloc2 = "";
+    int valcounter = 0, objcounter = 0, fileDownloadServerPort = 13132, fileServerPort = 13135, taskServerPort = 13133;
+    String simDBLoc = "", parsedCodeDBLoc = "";
     public static String OS = System.getProperty("os.name").toLowerCase();
     public static int OS_Name = 0;
     String HOST, ID, CNO, ClassName;
@@ -59,11 +56,11 @@ public class SIPS implements Serializable {
         this.ClassName = Classname;
         String workingDir = System.getProperty("user.dir");
         //int pid = Integer.parseInt(workingDir.substring(workingDir.lastIndexOf("/")));
-        dbloc = "sim.db";
+        simDBLoc = "sim.db";
         if (ClassName.contains(".")) {
             ClassName = ClassName.replaceAll("\\.", "/");
         }
-        dbloc2 = "src/" + ClassName + "-parsing.db";
+        parsedCodeDBLoc = ".parser/" + ClassName + "-parsing.db";
 
         if (isWindows()) {
             System.out.println("This is Windows");
@@ -88,7 +85,7 @@ public class SIPS implements Serializable {
         for (int i = 0; i <= str.length - 1; i++) {
             System.out.println("" + str[i]);
             sql = "UPDATE VAL" + valcounter + " set VALUE='" + str[i] + "' WHERE ID='" + i + "';";
-            db.Update(dbloc, sql);
+            db.Update(simDBLoc, sql);
         }
         db.closeConnection();
 
@@ -97,12 +94,12 @@ public class SIPS implements Serializable {
         String name, string, right;
         ArrayList<String> namelist = new ArrayList<>(), rightlist = new ArrayList<>();
         try {
-            rs = db.select(dbloc, sql);
+            rs = db.select(simDBLoc, sql);
             while (rs.next()) {
                 name = "" + rs.getString("NAME");
                 sql = "SELECT * FROM BINARYEXP ;";
 
-                ResultSet rs2 = db2.select(dbloc2, sql);
+                ResultSet rs2 = db2.select(parsedCodeDBLoc, sql);
                 while (rs2.next()) {
                     string = rs2.getString("String");
                     if (string.equalsIgnoreCase(name)) {
@@ -117,7 +114,7 @@ public class SIPS implements Serializable {
             db2.closeConnection();
             for (int i = 0; i <= namelist.size() - 1; i++) {
                 sql = "UPDATE VAL" + valcounter + " set NAME= REPLACE(NAME, '" + namelist.get(i) + "','" + rightlist.get(i) + "');";
-                db3.Update(dbloc, sql);
+                db3.Update(simDBLoc, sql);
             }
 
         } catch (SQLException ex) {
@@ -136,7 +133,7 @@ public class SIPS implements Serializable {
             System.out.println("" + obj);
 
             sql = "UPDATE OBJ" + objcounter + " set VALUE=? WHERE ID='0';";
-            db.Update(dbloc, sql, obj);
+            db.Update(simDBLoc, sql, obj);
 
         }
 
@@ -144,10 +141,10 @@ public class SIPS implements Serializable {
          sql = "CREATE TABLE CP "
          + "(ID INT PRIMARY KEY     NOT NULL,"
          + "VALUE LONGBLOB)";
-         //    db.createtable(dbloc, sql);
+         //    db.createtable(simDBLoc, sql);
          }
          sql = "INSERT INTO CP(ID,VALUE) VALUES('" + objcounter + "',?);";
-         //   db.Update(dbloc, sql, obj);
+         //   db.Update(simDBLoc, sql, obj);
          */ db.closeConnection();
 
         objcounter++;
@@ -202,13 +199,16 @@ public class SIPS implements Serializable {
 
             try {
                 s = new Socket();
-                s.connect(new InetSocketAddress(HOST, 13131));
+                s.connect(new InetSocketAddress(HOST, taskServerPort));
                 OutputStream os = s.getOutputStream();
                 DataOutputStream outToServer = new DataOutputStream(os);
-                String sendmsg = "<Command>breakLoop</Command>"
-                        + "<Body><PID>" + ID + "</PID>"
-                        + "<CNO>" + CNO + "</CNO>"
-                        + "</Body>";
+                JSONObject msg = new JSONObject();
+                msg.put("Command", "breakLoop");
+                JSONObject body = new JSONObject();
+                body.put("PID", ID);
+                body.put("CNO", CNO);
+                msg.put("body", body);
+                String sendmsg = msg.toString(2);
                 byte[] bytes = sendmsg.getBytes("UTF-8");
                 outToServer.writeInt(bytes.length);
                 outToServer.write(bytes);
@@ -260,16 +260,27 @@ public class SIPS implements Serializable {
             String checksum = null;
             File ipDir, ip2Dir = null;
             try (Socket s = new Socket()) {
-                s.connect(new InetSocketAddress(HOST, 13133));
+                s.connect(new InetSocketAddress(HOST, fileServerPort));
                 OutputStream os = s.getOutputStream();
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
-                    String sendmsg = "<Command>resolveObjectChecksum</Command>"
-                            + "<Body><PID>" + ID + "</PID>"
-                            + "<CNO>" + CNO + "</CNO>"
-                            + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
-                            + "<OBJECT>" + objectname + "</OBJECT>"
-                            + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
+                    JSONObject body = new JSONObject();
+                    body.put("PID", ID);
+                    body.put("CNO", CNO);
+                    body.put("CLASSNAME", ClassName);
+                    body.put("OBJECT", objectname);
+                    body.put("INSTANCE", Instancenumber);
 
+                    JSONObject msg = new JSONObject();
+                    msg.put("Command", "resolveObjectChecksum");
+                    msg.put("body", body);
+                    String sendmsg = msg.toString(2);
+
+//                    String sendmsg = "<Command>resolveObjectChecksum</Command>"
+//                            + "<Body><PID>" + ID + "</PID>"
+//                            + "<CNO>" + CNO + "</CNO>"
+//                            + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
+//                            + "<OBJECT>" + objectname + "</OBJECT>"
+//                            + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
@@ -328,17 +339,30 @@ public class SIPS implements Serializable {
                     Ndownloaded = false;
                 } else {
 
-                    try (Socket sock = new Socket("127.0.0.1", 13136)) {
+                    try (Socket sock = new Socket("127.0.0.1", fileDownloadServerPort)) {
                         //System.out.println("Connecting...");
                         try (OutputStream os = sock.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
-                            String sendmsg = "<Command>downloadObject</Command>"
-                                    + "<Body><PID>" + ID + "</PID>"
-                                    + "<CNO>" + CNO + "</CNO>"
-                                    + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
-                                    + "<OBJECT>" + objectname + "</OBJECT>"
-                                    + "<INSTANCE>" + Instancenumber + "</INSTANCE>"
-                                    + "<IP>" + HOST + "</IP><CHECKSUM>" + checksum + "</CHECKSUM></Body>";
+                            JSONObject body = new JSONObject();
+                            body.put("PID", ID);
+                            body.put("CNO", CNO);
+                            body.put("CLASSNAME", ClassName);
+                            body.put("OBJECT", objectname);
+                            body.put("INSTANCE", Instancenumber);
+                            body.put("IP", HOST);
+                            body.put("CHECKSUM", checksum);
 
+                            JSONObject msg = new JSONObject();
+                            msg.put("Command", "downloadObject");
+                            msg.put("body", body);
+                            String sendmsg = msg.toString(2);
+
+//                    String sendmsg = "<Command>downloadObject</Command>"
+//                                    + "<Body><PID>" + ID + "</PID>"
+//                                    + "<CNO>" + CNO + "</CNO>"
+//                                    + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
+//                                    + "<OBJECT>" + objectname + "</OBJECT>"
+//                                    + "<INSTANCE>" + Instancenumber + "</INSTANCE>"
+//                                    + "<IP>" + HOST + "</IP><CHECKSUM>" + checksum + "</CHECKSUM></Body>";
                             byte[] bytes = sendmsg.getBytes("UTF-8");
                             outToServer.writeInt(bytes.length);
                             outToServer.write(bytes);
@@ -349,8 +373,8 @@ public class SIPS implements Serializable {
                                 if (length > 0) {
                                     dIn.readFully(message, 0, message.length); // read the message
                                 }
-                                String reply = new String(message);
-                                String rpl = reply.substring(reply.indexOf("<MSG>") + 5, reply.indexOf("</MSG>"));
+                                JSONObject reply = new JSONObject(new String(message));
+                                String rpl = reply.getString("MSG");//substring(reply.indexOf("<MSG>") + 5, reply.indexOf("</MSG>"));
                                 if (rpl.equalsIgnoreCase("finished")) {
                                     // receive file
 
@@ -364,9 +388,9 @@ public class SIPS implements Serializable {
                                     }
 
                                 } else if (rpl.equalsIgnoreCase("inque")) {
-                                    String vl = reply.substring(reply.indexOf("<RT>") + 4, reply.indexOf("</RT>"));
+                                    Long vl = reply.getLong("RT");//substring(reply.indexOf("<RT>") + 4, reply.indexOf("</RT>"));
                                     sock.close();
-                                    Thread.currentThread().sleep(Long.parseLong(vl) + 10);
+                                    Thread.currentThread().sleep((vl) + 10);
 
                                 } else if (rpl.equalsIgnoreCase("addedinq")) {
                                     sock.close();
@@ -474,14 +498,26 @@ public class SIPS implements Serializable {
             }
             try {
                 try (Socket s = new Socket()) {
-                    s.connect(new InetSocketAddress(HOST, 13131));
+                    s.connect(new InetSocketAddress(HOST, fileServerPort));
                     OutputStream os = s.getOutputStream();
                     try (DataOutputStream outToServer = new DataOutputStream(os)) {
-                        String sendmsg = "<Command>saveArrayElement</Command><Body><PID>" + ID + "</PID>"
-                                + "<CNO>" + CNO + "</CNO>"
-                                + "<OBJECT>" + objectname + "</OBJECT>"
-                                + "<POSITION>" + position + "</POSITION>"
-                                + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
+                        JSONObject body = new JSONObject();
+                        body.put("PID", ID);
+                        body.put("CNO", CNO);
+                        body.put("OBJECT", objectname);
+                        body.put("INSTANCE", Instancenumber);
+                        body.put("POSITION", position);
+
+                        JSONObject msg = new JSONObject();
+                        msg.put("Command", "saveArrayElement");
+                        msg.put("body", body);
+                        String sendmsg = msg.toString(2);
+
+//                        String sendmsg = "<Command>saveArrayElement</Command><Body><PID>" + ID + "</PID>"
+//                                + "<CNO>" + CNO + "</CNO>"
+//                                + "<OBJECT>" + objectname + "</OBJECT>"
+//                                + "<POSITION>" + position + "</POSITION>"
+//                                + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
                         byte[] bytes = sendmsg.getBytes("UTF-8");
                         outToServer.writeInt(bytes.length);
                         outToServer.write(bytes);
@@ -526,12 +562,24 @@ public class SIPS implements Serializable {
                 OutputStream os = s.getOutputStream();
                 ObjectOutputStream inStream;
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
-                    String sendmsg = "<Command>updateArrayElement</Command>"
-                            + "<Body><PID>" + ID + "</PID>"
-                            + "<CNO>" + CNO + "</CNO>"
-                            + "<OBJECT>" + objectname + "</OBJECT>"
-                            + "<POSITION>" + position + "</POSITION>"
-                            + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
+                    JSONObject body = new JSONObject();
+                    body.put("PID", ID);
+                    body.put("CNO", CNO);
+                    body.put("OBJECT", objectname);
+                    body.put("INSTANCE", Instancenumber);
+                    body.put("POSITION", position);
+
+                    JSONObject msg = new JSONObject();
+                    msg.put("Command", "updateArrayElement");
+                    msg.put("body", body);
+                    String sendmsg = msg.toString(2);
+
+//                    String sendmsg = "<Command>updateArrayElement</Command>"
+//                            + "<Body><PID>" + ID + "</PID>"
+//                            + "<CNO>" + CNO + "</CNO>"
+//                            + "<OBJECT>" + objectname + "</OBJECT>"
+//                            + "<POSITION>" + position + "</POSITION>"
+//                            + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
@@ -573,15 +621,27 @@ public class SIPS implements Serializable {
             }
             try {
                 s = new Socket();
-                s.connect(new InetSocketAddress(HOST, 13131));
+                s.connect(new InetSocketAddress(HOST, fileServerPort));
                 OutputStream os = s.getOutputStream();
                 DataOutputStream outToServer = new DataOutputStream(os);
-                String sendmsg = "<Command>resolveArrayElement</Command>"
-                        + "<Body><PID>" + ID + "</PID>"
-                        + "<CNO>" + CNO + "</CNO>"
-                        + "<OBJECT>" + objectname + "</OBJECT>"
-                        + "<POSITION>" + position + "</POSITION>"
-                        + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
+                JSONObject body = new JSONObject();
+                body.put("PID", ID);
+                body.put("CNO", CNO);
+                body.put("OBJECT", objectname);
+                body.put("INSTANCE", Instancenumber);
+                body.put("POSITION", position);
+
+                JSONObject msg = new JSONObject();
+                msg.put("Command", "resolveArrayElement");
+                msg.put("body", body);
+                String sendmsg = msg.toString(2);
+
+//                String sendmsg = "<Command>resolveArrayElement</Command>"
+//                        + "<Body><PID>" + ID + "</PID>"
+//                        + "<CNO>" + CNO + "</CNO>"
+//                        + "<OBJECT>" + objectname + "</OBJECT>"
+//                        + "<POSITION>" + position + "</POSITION>"
+//                        + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
                 byte[] bytes = sendmsg.getBytes("UTF-8");
                 outToServer.writeInt(bytes.length);
                 outToServer.write(bytes);
@@ -632,6 +692,22 @@ public class SIPS implements Serializable {
 
         return (OS.indexOf("sunos") >= 0);
 
+    }
+
+    public int getFileDownloadServerPort() {
+        return fileDownloadServerPort;
+    }
+
+    public void setFileDownloadServerPort(int fileDownloadServerPort) {
+        this.fileDownloadServerPort = fileDownloadServerPort;
+    }
+
+    public int getFileServerPort() {
+        return fileServerPort;
+    }
+
+    public void setFileServerPort(int fileServerPort) {
+        this.fileServerPort = fileServerPort;
     }
 
 }
