@@ -80,7 +80,7 @@ public class SIPS implements Serializable {
         }
     }
 
-    public void saveDValues(String... str) {
+    public void saveValues(String... str) {
         String sql = "";
         for (int i = 0; i <= str.length - 1; i++) {
             System.out.println("" + str[i]);
@@ -125,7 +125,7 @@ public class SIPS implements Serializable {
         db3.closeConnection();
     }
 
-    public void saveDObject(Object obj) {
+    public void saveObject(Object obj) {
         String sql = "";
         //for (int i = 0; i <= obj.length - 1; i++) 
         {
@@ -150,7 +150,7 @@ public class SIPS implements Serializable {
         objcounter++;
     }
 
-    public void saveDObject(String objectName, int instance, Object obj) {
+    public void saveObject(String objectName, int instance, Object obj) {
         Thread t = new Thread(() -> {
             try {
                 // Mobile m1 = new Mobile(obj);
@@ -186,12 +186,12 @@ public class SIPS implements Serializable {
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
             } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
@@ -245,12 +245,12 @@ public class SIPS implements Serializable {
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
             } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
@@ -297,7 +297,7 @@ public class SIPS implements Serializable {
                         }
                         String reply = new String(message);
                         System.out.println("Recieved " + reply + " from " + HOST);
-                        String cachedir = workingDir.substring(0, workingDir.lastIndexOf("/var/"));
+                        String cachedir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
                         ipDir = new File(cachedir + "/cache/" + HOST);
                         if (!ipDir.exists()) {
                             ipDir.mkdirs();
@@ -437,12 +437,12 @@ public class SIPS implements Serializable {
      //System.out.println("Current working directory : " + workingDir);
      if (workingDir.contains("-ID-")) {
      if (OS_Name == 2) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+     HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
      ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
      CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
      } else if (OS_Name == 0) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+     HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
      ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
      CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
@@ -487,11 +487,11 @@ public class SIPS implements Serializable {
         // System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
             } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
@@ -536,7 +536,15 @@ public class SIPS implements Serializable {
         }
     }
 
-    public void simulateDLoop() {
+    public void simulateLoop() {
+
+    }
+
+    public void initTask(String name) {
+
+    }
+
+    public void endTask(String name) {
 
     }
 
@@ -547,11 +555,11 @@ public class SIPS implements Serializable {
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
             } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
@@ -610,11 +618,11 @@ public class SIPS implements Serializable {
         // System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/var/") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
             } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\var\\") + 5, workingDir.indexOf("-ID"));
+                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
