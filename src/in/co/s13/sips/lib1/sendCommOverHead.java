@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package lib1;
+package in.co.s13.sips.lib1;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

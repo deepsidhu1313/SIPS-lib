@@ -14,9 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package lib1;
+package in.co.s13.sips.lib1;
 
-import db.SQLiteJDBC;
+import in.co.s13.SIPS.db.SQLiteJDBC;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -52,15 +52,15 @@ public class SIPS implements Serializable {
     public static int OS_Name = 0;
     String HOST, ID, CNO, ClassName;
 
-    public SIPS(String Classname) {
-        this.ClassName = Classname;
-        String workingDir = System.getProperty("user.dir");
+    public SIPS(String projectName, String className) {
+        this.ClassName = className;
+        String homeDir = System.getProperty("user.home") + "/.SIPS";
         //int pid = Integer.parseInt(workingDir.substring(workingDir.lastIndexOf("/")));
-        simDBLoc = "sim.db";
         if (ClassName.contains(".")) {
             ClassName = ClassName.replaceAll("\\.", "/");
         }
-        parsedCodeDBLoc = ".parser/" + ClassName + "-parsing.db";
+        simDBLoc = homeDir + "/.simulated/" + projectName + "/" + ClassName + "sim.db";
+        parsedCodeDBLoc = homeDir + "/.parser/" + projectName + "/" + ClassName + "-parsing.db";
 
         if (isWindows()) {
             System.out.println("This is Windows");
@@ -230,11 +230,17 @@ public class SIPS implements Serializable {
 
     }
 
-    public void FragementHeader(int i) {
+    public void parallelFor() {
+    }
+
+    public void endParallelFor() {
+    }
+
+    public void simulateSection() {
 
     }
 
-    public void FragementFoot(int i) {
+    public void endSimulateSection() {
 
     }
 
@@ -416,10 +422,7 @@ public class SIPS implements Serializable {
             //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
             //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
             try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
-
-                //   Mobile m1 = (Mobile) ois.readObject();
                 value = ois.readObject();
-                // value = m1.getNumber();
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException | ClassNotFoundException ex) {
