@@ -82,9 +82,9 @@ public class Lib1 {
 
             while (rs.next()) {
                 System.out.println("" + rs.getString("Category"));
-                if (rs.getString("Category").contains("ForLoop") || rs.getString("Category").contains("WhileLoop")) {
+                if (rs.getString("Category").contains("ForLoop") || rs.getString("Category").contains("WhileLoop")||rs.getString("Category").contains("SimulateSection")) {
                     if (mode == 0) {
-                        if (rs.getString("SIM").contains("TRUE")) {
+                        if (rs.getString("SIM").equalsIgnoreCase("TRUE")) {
 
                         } else {
                             combeginline.add(rs.getInt("BeginLine"));
@@ -94,7 +94,7 @@ public class Lib1 {
                             comlevel.add(rs.getInt("Level"));
                         }
                     } else if (mode == 1) {
-                        if (rs.getString("SIM").contains("TRUE")) {
+                        if (rs.getString("SIM").equalsIgnoreCase("TRUE")) {
                             combeginline.add(rs.getInt("BeginLine"));
                             combegincol.add(rs.getInt("BeginColumn"));
                             comendline.add(rs.getInt("EndLine"));

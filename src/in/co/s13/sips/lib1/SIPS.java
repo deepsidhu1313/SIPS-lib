@@ -230,6 +230,11 @@ public class SIPS implements Serializable {
 
     }
 
+    @Deprecated
+    public void simulateLoop() {
+
+    }
+
     public void parallelFor() {
     }
 
@@ -241,6 +246,27 @@ public class SIPS implements Serializable {
     }
 
     public void endSimulateSection() {
+
+    }
+
+    public void defineTask(String taskname) {
+
+    }
+
+    public void setTaskResourcePriority(String taskname, String... resources) {
+
+    }
+
+    public void setDuration(String taskname, long duration) {
+
+    }
+    
+    public void setTimeout(String taskname, long duration) {
+
+    }
+
+    
+    public void endTask(String taskname) {
 
     }
 
@@ -537,18 +563,6 @@ public class SIPS implements Serializable {
             }
 
         }
-    }
-
-    public void simulateLoop() {
-
-    }
-
-    public void initTask(String name) {
-
-    }
-
-    public void endTask(String name) {
-
     }
 
     public void updateArrayElement(Object obj, String objectname, String position, int Instancenumber) {
