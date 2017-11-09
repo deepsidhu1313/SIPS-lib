@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package in.co.s13.sips.lib1;
+package in.co.s13.sips.lib;
 
 import in.co.s13.SIPS.db.SQLiteJDBC;
 import java.io.DataInputStream;
@@ -85,7 +85,7 @@ public class SIPS implements Serializable {
         for (int i = 0; i <= str.length - 1; i++) {
             System.out.println("" + str[i]);
             sql = "UPDATE VAL" + valcounter + " set VALUE='" + str[i] + "' WHERE ID='" + i + "';";
-            db.Update(simDBLoc, sql);
+            db.update(simDBLoc, sql);
         }
         db.closeConnection();
 
@@ -114,7 +114,7 @@ public class SIPS implements Serializable {
             db2.closeConnection();
             for (int i = 0; i <= namelist.size() - 1; i++) {
                 sql = "UPDATE VAL" + valcounter + " set NAME= REPLACE(NAME, '" + namelist.get(i) + "','" + rightlist.get(i) + "');";
-                db3.Update(simDBLoc, sql);
+                db3.update(simDBLoc, sql);
             }
 
         } catch (SQLException ex) {
@@ -133,7 +133,7 @@ public class SIPS implements Serializable {
             System.out.println("" + obj);
 
             sql = "UPDATE OBJ" + objcounter + " set VALUE=? WHERE ID='0';";
-            db.Update(simDBLoc, sql, obj);
+            db.update(simDBLoc, sql, obj);
 
         }
 

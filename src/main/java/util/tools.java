@@ -31,14 +31,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * 
- * @author NAVDEEP SINGH SIDHU <navdeepsingh.sidhu95@gmail.com>
- */
+
 public class tools {
-public static String getCheckSum(String datafile) {
+
+    public static String getCheckSum(String datafile) {
         StringBuilder sb = new StringBuilder("");
-        if (datafile.substring(datafile.lastIndexOf(".")+1).equalsIgnoreCase("sha")) {
+        if (datafile.substring(datafile.lastIndexOf(".") + 1).equalsIgnoreCase("sha")) {
             System.out.println("Didn't computed CheckSum for " + datafile);
             return "";
         }
@@ -127,7 +125,8 @@ public static String getCheckSum(String datafile) {
 
         }
     }
-public static void copyFileUsingStream(File source, File dest) {
+
+    public static void copyFileUsingStream(File source, File dest) {
         if (dest.exists()) {
             dest.delete();
         }
@@ -195,7 +194,7 @@ public static void copyFileUsingStream(File source, File dest) {
         if (dest.exists()) {
             dest.delete();
         }
-         if (!dest.getParentFile().exists()) {
+        if (!dest.getParentFile().exists()) {
             dest.getParentFile().mkdirs();
         }
         if (!source.exists()) {
@@ -249,5 +248,3 @@ public static void copyFileUsingStream(File source, File dest) {
     }
 
 }
-
-
