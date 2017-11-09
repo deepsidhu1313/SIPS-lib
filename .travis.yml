@@ -29,4 +29,4 @@ sudo: required
 
 
 script:
-  - mvn clean -Dgpg.skip package
+  - mvn install -Dgpg.skip
