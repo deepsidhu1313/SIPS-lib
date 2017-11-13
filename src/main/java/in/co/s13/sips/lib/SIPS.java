@@ -52,15 +52,15 @@ public class SIPS implements Serializable {
     public static int OS_Name = 0;
     String HOST, ID, CNO, ClassName;
 
-    public SIPS(String projectName, String className) {
+        String homeDir = System.getProperty("user.dir");
+    public SIPS(String className) {
         this.ClassName = className;
-        String homeDir = System.getProperty("user.home") + "/.SIPS";
         //int pid = Integer.parseInt(workingDir.substring(workingDir.lastIndexOf("/")));
         if (ClassName.contains(".")) {
             ClassName = ClassName.replaceAll("\\.", "/");
         }
-        simDBLoc = homeDir + "/.simulated/" + projectName + "/" + ClassName + "sim.db";
-        parsedCodeDBLoc = homeDir + "/.parser/" + projectName + "/" + ClassName + "-parsing.db";
+        simDBLoc = homeDir + "/.simulated/" + ClassName + "-sim.db";
+        parsedCodeDBLoc = homeDir + "/.parsed/" +ClassName + "-parsed.db";
 
         if (isWindows()) {
             System.out.println("This is Windows");
@@ -97,7 +97,7 @@ public class SIPS implements Serializable {
             rs = db.select(simDBLoc, sql);
             while (rs.next()) {
                 name = "" + rs.getString("NAME");
-                sql = "SELECT * FROM BINARYEXP ;";
+                sql = "SELECT * FROM BINARYEXP;";
 
                 ResultSet rs2 = db2.select(parsedCodeDBLoc, sql);
                 while (rs2.next()) {
@@ -154,7 +154,7 @@ public class SIPS implements Serializable {
         Thread t = new Thread(() -> {
             try {
                 // Mobile m1 = new Mobile(obj);
-                String path = "sim/" + ClassName + "/";
+                String path = homeDir + "/.simulated/" + ClassName+ "/";
                 File df = new File(path);
                 if (!df.exists()) {
                     df.mkdirs();
@@ -168,7 +168,7 @@ public class SIPS implements Serializable {
                 Thread th = new Thread(() -> {
                     tools.getCheckSum(path2);
                 });
-                System.out.println("Saved The Object at" + path);
+                System.out.println("Saved The Object at " + path);
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
@@ -260,12 +260,11 @@ public class SIPS implements Serializable {
     public void setDuration(String taskname, long duration) {
 
     }
-    
+
     public void setTimeout(String taskname, long duration) {
 
     }
 
-    
     public void endTask(String taskname) {
 
     }
@@ -317,7 +316,7 @@ public class SIPS implements Serializable {
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
 
-                    path = "sim/" + ClassName + "/";
+                    path = homeDir + "/.simulated/" + ClassName + "/";
                     path += "" + objectname + "-instance-" + Instancenumber + ".obj";
 
                     try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {

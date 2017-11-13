@@ -22,10 +22,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 
-/**
- *
- * @author navdeep singh <navdeepsingh.sidhu95@gmail.com>
- */
+
 public class ChunkCalculator implements Runnable {
 
     int Process_ID;
