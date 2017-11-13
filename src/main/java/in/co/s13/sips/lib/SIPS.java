@@ -145,7 +145,8 @@ public class SIPS implements Serializable {
          }
          sql = "INSERT INTO CP(ID,VALUE) VALUES('" + objcounter + "',?);";
          //   db.Update(simDBLoc, sql, obj);
-         */ db.closeConnection();
+         */ 
+        db.closeConnection();
 
         objcounter++;
     }

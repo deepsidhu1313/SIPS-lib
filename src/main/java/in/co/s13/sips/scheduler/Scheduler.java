@@ -5,6 +5,8 @@
  */
 package in.co.s13.sips.scheduler;
 
+import in.co.s13.sips.lib.ParallelForSENP;
+import in.co.s13.sips.lib.TaskNodePair;
 import java.util.ArrayList;
 
 /**
@@ -12,5 +14,6 @@ import java.util.ArrayList;
  * @author nika
  */
 public interface Scheduler {
-    public ArrayList<String> schedule();
+    public ArrayList<TaskNodePair> schedule();
+    public ArrayList<ParallelForSENP> scheduleParallelFor();
 }
