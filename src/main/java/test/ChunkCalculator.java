@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2017 Navdeep Singh Sidhu
+ * Copyright (C) 2018 Navdeep Singh Sidhu
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

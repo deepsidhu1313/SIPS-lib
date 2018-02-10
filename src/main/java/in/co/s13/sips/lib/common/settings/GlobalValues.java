@@ -14,18 +14,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package in.co.s13.sips.scheduler;
+package in.co.s13.sips.lib.common.settings;
 
-import in.co.s13.sips.lib.ParallelForSENP;
-import in.co.s13.sips.lib.TaskNodePair;
-import in.co.s13.sips.lib.common.datastructure.LiveNode;
-import java.util.ArrayList;
+import in.co.s13.sips.lib.common.datastructure.Hop;
+import in.co.s13.sips.lib.common.datastructure.UniqueElementList;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
  * @author nika
  */
-public interface Scheduler {
-    public ArrayList<TaskNodePair> schedule();
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<LiveNode> nodes,Object start,Object end,boolean reverseLoop,int dataType);
+public class GlobalValues {
+
+    public static ConcurrentHashMap<String, Hop> ADJACENT_NODES_TABLE = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<String, UniqueElementList> NON_ADJACENT_NODES_TABLE = new ConcurrentHashMap<>();
+    public static long NODE_EXPIRY_TIME = 60;
+
 }
