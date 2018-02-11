@@ -237,8 +237,8 @@ public class LiveNode implements Node{
         result.put("ipAddresses", new JSONArray(ipAddresses.toArray()));
         result.put("benchmarking_results", benchmarking_results);
         result.put("lastCheckedOn", lastCheckedOn);
-        result.put("lastCheckAgo", getLastCheckAgo());
-        result.put("distanceFromCurrent", getDistanceFromCurrent());
+        result.put("lastCheckAgo", this.getLastCheckAgo());
+        result.put("distanceFromCurrent", this.getDistanceFromCurrent());
         return result;
     }
 
@@ -371,30 +371,25 @@ public class LiveNode implements Node{
             }
         },
         PROCESSOR {
+            @Override
             public int compare(Node o1, Node o2) {
                 return (o1.getProcessor_name()).compareTo(o2.getProcessor_name());
             }
         };
 
         public static Comparator<Node> decending(final Comparator<Node> other) {
-            return new Comparator<Node>() {
-                public int compare(Node o1, Node o2) {
-                    return -1 * other.compare(o1, o2);
-                }
-            };
+            return (Node o1, Node o2) -> -1 * other.compare(o1, o2);
         }
 
         public static Comparator<Node> getComparator(final LiveNodeComparator... multipleOptions) {
-            return new Comparator<Node>() {
-                public int compare(Node o1, Node o2) {
-                    for (LiveNodeComparator option : multipleOptions) {
-                        int result = option.compare(o1, o2);
-                        if (result != 0) {
-                            return result;
-                        }
+            return (Node o1, Node o2) -> {
+                for (LiveNodeComparator option : multipleOptions) {
+                    int result = option.compare(o1, o2);
+                    if (result != 0) {
+                        return result;
                     }
-                    return 0;
                 }
+                return 0;
             };
         }
     }
