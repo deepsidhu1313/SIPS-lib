@@ -18,7 +18,7 @@ package in.co.s13.sips.scheduler;
 
 import in.co.s13.sips.lib.ParallelForSENP;
 import in.co.s13.sips.lib.TaskNodePair;
-import in.co.s13.sips.lib.common.datastructure.LiveNode;
+import in.co.s13.sips.lib.common.datastructure.Node;
 import java.util.ArrayList;
 
 /**
@@ -27,5 +27,5 @@ import java.util.ArrayList;
  */
 public interface Scheduler {
     public ArrayList<TaskNodePair> schedule();
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<LiveNode> nodes,Object start,Object end,boolean reverseLoop,int dataType);
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,Object start,Object end,boolean reverseLoop,int dataType);
 }
