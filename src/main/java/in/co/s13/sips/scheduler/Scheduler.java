@@ -21,6 +21,7 @@ import in.co.s13.sips.lib.TaskNodePair;
 import in.co.s13.sips.lib.common.datastructure.Node;
 import in.co.s13.sips.lib.common.datastructure.ParallelForLoop;
 import java.util.ArrayList;
+import org.json.JSONObject;
 
 /**
  *
@@ -28,5 +29,5 @@ import java.util.ArrayList;
  */
 public interface Scheduler {
     public ArrayList<TaskNodePair> schedule();
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,ParallelForLoop loop);
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings);
 }

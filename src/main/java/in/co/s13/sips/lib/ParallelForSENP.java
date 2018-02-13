@@ -26,6 +26,10 @@ public class ParallelForSENP {
 
     private String start, end, nodeUUID;
 
+    public ParallelForSENP() {
+    }
+    
+    
     public ParallelForSENP(String start, String end, String nodeUUID) {
         this.start = start;
         this.end = end;
