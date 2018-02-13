@@ -28,6 +28,6 @@ public class GlobalValues {
 
     public static ConcurrentHashMap<String, Hop> ADJACENT_NODES_TABLE = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, UniqueElementList> NON_ADJACENT_NODES_TABLE = new ConcurrentHashMap<>();
-    public static long NODE_EXPIRY_TIME = 60;
+    public static long NODE_EXPIRY_TIME = 600;
 
 }

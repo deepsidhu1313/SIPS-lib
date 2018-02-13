@@ -20,6 +20,7 @@ import in.co.s13.sips.lib.ParallelForSENP;
 import in.co.s13.sips.lib.TaskNodePair;
 import in.co.s13.sips.lib.common.datastructure.LiveNode;
 import in.co.s13.sips.lib.common.datastructure.Node;
+import in.co.s13.sips.lib.common.datastructure.ParallelForLoop;
 import java.io.Serializable;
 import java.util.ArrayList;
 
@@ -40,8 +41,8 @@ public class LoadScheduler implements Serializable {
         return scheduler.schedule(); //To change body of generated methods, choose Tools | Templates.
     }
 
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,Object start,Object end,boolean reverseLoop,int dataType) {
-        return scheduler.scheduleParallelFor(nodes, start, end, reverseLoop, dataType);
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,ParallelForLoop loop) {
+        return scheduler.scheduleParallelFor(nodes, loop);
     }
 
 }
