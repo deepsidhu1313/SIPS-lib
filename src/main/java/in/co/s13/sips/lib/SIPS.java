@@ -188,13 +188,13 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
 
@@ -278,13 +278,13 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
             String lchecksum = "";
@@ -517,12 +517,12 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
             try {
@@ -573,12 +573,12 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
             try {
@@ -636,12 +636,12 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
             try {
