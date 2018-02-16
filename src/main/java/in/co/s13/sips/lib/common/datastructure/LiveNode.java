@@ -24,7 +24,7 @@ import java.util.Objects;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public class LiveNode implements Node{
+public class LiveNode implements Node {
 
     private int task_limit, waiting_in_que;
     private String uuid, operatingSytem, hostname, processor_name;
@@ -33,7 +33,7 @@ public class LiveNode implements Node{
     private ArrayList<String> ipAddresses = new ArrayList<>();
     private JSONObject benchmarking_results;
     private long distanceFromCurrent;
-    
+
     public LiveNode(String uuid, String host, String os, String processor, int task_limit,
             int qwait, long ram, long free_memory, long hdd_size, long hdd_free, JSONObject benchmarking_results, long lastCheckedOn) {
         this.uuid = uuid;
@@ -64,8 +64,10 @@ public class LiveNode implements Node{
         JSONArray array = livedbRow.getJSONArray("ipAddresses");
         for (int i = 0; i < array.length(); i++) {
             String ip = array.getString(i);
+            if (ip.contains("%")) {
+                ip = ip.substring(0, ip.indexOf("%"));
+            }
             addIp(ip);
-//            NetScanner.addip(ip);
         }
         benchmarking_results = livedbRow.getJSONObject("benchmarking_results");
         lastCheckAgo = livedbRow.getLong("lastCheckAgo");

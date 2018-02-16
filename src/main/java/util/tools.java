@@ -22,15 +22,17 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import org.json.JSONObject;
 
 public class tools {
 
@@ -141,51 +143,18 @@ public class tools {
                 Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        InputStream is = null;
-        OutputStream os = null;
-        try {
-            is = new FileInputStream(source);
-            os = new FileOutputStream(dest);
+
+        try (InputStream is = new FileInputStream(source); OutputStream os = new FileOutputStream(dest)) {
             byte[] buffer = new byte[1024];
             int length;
             while ((length = is.read(buffer)) > 0) {
                 os.write(buffer, 0, length);
             }
             System.out.println("" + source.getAbsolutePath() + " copied to " + dest.getAbsolutePath() + " ");
-
-            try {
-                is.close();
-                os.close();
-            } catch (IOException ex) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                is.close();
-                os.close();
-            } catch (IOException e) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
         } catch (IOException ex) {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                is.close();
-                os.close();
-            } catch (IOException e) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        } finally {
-            try {
-                is.close();
-                os.close();
-            } catch (IOException ex) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
+
     }
 
     public static void copyFileUsingStream(String pathtosrc, String pathtodest) {
@@ -201,50 +170,68 @@ public class tools {
             System.out.println("" + pathtosrc + " does not exist");
             return;
         }
-        InputStream is = null;
-        OutputStream os = null;
-        try {
-            is = new FileInputStream(source);
-            os = new FileOutputStream(dest);
+
+        try (InputStream is = new FileInputStream(source); OutputStream os = new FileOutputStream(dest)) {
             byte[] buffer = new byte[1024];
             int length;
             while ((length = is.read(buffer)) > 0) {
                 os.write(buffer, 0, length);
             }
             System.out.println("" + source.getAbsolutePath() + " copied to " + dest.getAbsolutePath() + " ");
-            try {
-                is.close();
-                os.close();
-            } catch (IOException ex) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
 
         } catch (FileNotFoundException ex) {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                is.close();
-                os.close();
-            } catch (IOException x) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
         } catch (IOException ex) {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            try {
-                is.close();
-                os.close();
-            } catch (IOException x) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        } finally {
-            try {
-                is.close();
-                os.close();
-            } catch (IOException ex) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
+
+    }
+
+    public static String readFile(String location) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new FileReader(location))) {
+            String line = br.readLine();
+            while (line != null) {
+                sb.append(line);
+                sb.append(System.lineSeparator());
+                line = br.readLine();
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return sb.toString();
+    }
+
+    public static JSONObject readJSONFile(String location) {
+        String content = readFile(location).trim();
+        return new JSONObject((content.length() < 1) ? "{}" : content);
+    }
+
+    public static void write(File f, String text) {
+        f.getParentFile().mkdirs();
+        try (FileWriter fw = new FileWriter(f);
+                PrintWriter pw = new PrintWriter(fw)) {
+            pw.print(text);
+            pw.close();
+            fw.close();
+        } catch (IOException ex) {
+            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+    }
+
+    public static void write(String path, String text) {
+        File file = new File(path);
+        file.getParentFile().mkdirs();
+        try (FileWriter fw = new FileWriter(new File(path));
+                PrintWriter pw = new PrintWriter(fw)) {
+            pw.print(text);
+            pw.close();
+            fw.close();
+        } catch (IOException ex) {
+            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
     }
 
 }

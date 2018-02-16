@@ -46,13 +46,14 @@ public class SIPS implements Serializable {
     public SQLiteJDBC db2 = new SQLiteJDBC();
     public SQLiteJDBC db3 = new SQLiteJDBC();
     public ArrayList checkpoint = new ArrayList();
-    int valcounter = 0, objcounter = 0, fileDownloadServerPort = 13132, fileServerPort = 13135, taskServerPort = 13133;
+    int valcounter = 0, objcounter = 0, fileDownloadServerPort = 13132, taskServerPort = 13133, fileServerPort = 13135;
     String simDBLoc = "", parsedCodeDBLoc = "";
     public static String OS = System.getProperty("os.name").toLowerCase();
     public static int OS_Name = 0;
     String HOST, ID, CNO, ClassName;
 
-        String homeDir = System.getProperty("user.dir");
+    String homeDir = System.getProperty("user.dir");
+
     public SIPS(String className) {
         this.ClassName = className;
         //int pid = Integer.parseInt(workingDir.substring(workingDir.lastIndexOf("/")));
@@ -60,8 +61,9 @@ public class SIPS implements Serializable {
             ClassName = ClassName.replaceAll("\\.", "/");
         }
         simDBLoc = homeDir + "/.simulated/" + ClassName + "-sim.db";
-        parsedCodeDBLoc = homeDir + "/.parsed/" +ClassName + "-parsed.db";
-
+        parsedCodeDBLoc = homeDir + "/.parsed/" + ClassName + "-parsed.db";
+        System.out.println("SIM DB Location: " + simDBLoc);
+        System.out.println("PARSED DB Location: " + parsedCodeDBLoc);
         if (isWindows()) {
             System.out.println("This is Windows");
             OS_Name = 0;
@@ -127,27 +129,12 @@ public class SIPS implements Serializable {
 
     public void saveObject(Object obj) {
         String sql = "";
-        //for (int i = 0; i <= obj.length - 1; i++) 
         {
-            //checkpoint.add(i, obj);
             System.out.println("" + obj);
-
             sql = "UPDATE OBJ" + objcounter + " set VALUE=? WHERE ID='0';";
             db.update(simDBLoc, sql, obj);
-
         }
-
-        /*  if (objcounter == 0) {
-         sql = "CREATE TABLE CP "
-         + "(ID INT PRIMARY KEY     NOT NULL,"
-         + "VALUE LONGBLOB)";
-         //    db.createtable(simDBLoc, sql);
-         }
-         sql = "INSERT INTO CP(ID,VALUE) VALUES('" + objcounter + "',?);";
-         //   db.Update(simDBLoc, sql, obj);
-         */ 
         db.closeConnection();
-
         objcounter++;
     }
 
@@ -155,7 +142,7 @@ public class SIPS implements Serializable {
         Thread t = new Thread(() -> {
             try {
                 // Mobile m1 = new Mobile(obj);
-                String path = homeDir + "/.simulated/" + ClassName+ "/";
+                String path = homeDir + "/.simulated/" + ClassName + "/";
                 File df = new File(path);
                 if (!df.exists()) {
                     df.mkdirs();
@@ -169,6 +156,7 @@ public class SIPS implements Serializable {
                 Thread th = new Thread(() -> {
                     tools.getCheckSum(path2);
                 });
+                th.start();
                 System.out.println("Saved The Object at " + path);
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
@@ -274,7 +262,7 @@ public class SIPS implements Serializable {
         Object value = null;
         //   Socket s = null;
         String workingDir = System.getProperty("user.dir");
-        //System.out.println("Current working directory : " + workingDir);
+        System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
@@ -291,8 +279,14 @@ public class SIPS implements Serializable {
             String path = null;
             String checksum = null;
             File ipDir, ip2Dir = null;
-            try (Socket s = new Socket()) {
-                s.connect(new InetSocketAddress(HOST, fileServerPort));
+            JSONObject meta = tools.readJSONFile(workingDir + "/meta.json");
+            ID = meta.getString("JOB_TOKEN", ID);
+            HOST = meta.getString("SENDER_IP", HOST);
+            CNO = meta.getString("CHUNK_NO", CNO);
+            String senderUUID = meta.getString("SENDER_UUID");
+            String projectName = meta.getString("PROJECT");
+            System.out.println("Host : " + HOST + " Port: " + fileServerPort);
+            try (Socket s = new Socket(HOST, fileServerPort)) {
                 OutputStream os = s.getOutputStream();
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
                     JSONObject body = new JSONObject();
@@ -301,18 +295,11 @@ public class SIPS implements Serializable {
                     body.put("CLASSNAME", ClassName);
                     body.put("OBJECT", objectname);
                     body.put("INSTANCE", Instancenumber);
-
                     JSONObject msg = new JSONObject();
                     msg.put("Command", "resolveObjectChecksum");
                     msg.put("body", body);
                     String sendmsg = msg.toString(2);
 
-//                    String sendmsg = "<Command>resolveObjectChecksum</Command>"
-//                            + "<Body><PID>" + ID + "</PID>"
-//                            + "<CNO>" + CNO + "</CNO>"
-//                            + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
-//                            + "<OBJECT>" + objectname + "</OBJECT>"
-//                            + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
@@ -329,8 +316,8 @@ public class SIPS implements Serializable {
                         }
                         String reply = new String(message);
                         System.out.println("Recieved " + reply + " from " + HOST);
-                        String cachedir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
-                        ipDir = new File(cachedir + "/cache/" + HOST);
+                        String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
+                        ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
                         if (!ipDir.exists()) {
                             ipDir.mkdirs();
                         }
@@ -381,6 +368,8 @@ public class SIPS implements Serializable {
                             body.put("OBJECT", objectname);
                             body.put("INSTANCE", Instancenumber);
                             body.put("IP", HOST);
+                            body.put("UUID", senderUUID);
+                            body.put("PROJECT", projectName);
                             body.put("CHECKSUM", checksum);
 
                             JSONObject msg = new JSONObject();
@@ -388,13 +377,6 @@ public class SIPS implements Serializable {
                             msg.put("body", body);
                             String sendmsg = msg.toString(2);
 
-//                    String sendmsg = "<Command>downloadObject</Command>"
-//                                    + "<Body><PID>" + ID + "</PID>"
-//                                    + "<CNO>" + CNO + "</CNO>"
-//                                    + "<CLASSNAME>" + ClassName + "</CLASSNAME>"
-//                                    + "<OBJECT>" + objectname + "</OBJECT>"
-//                                    + "<INSTANCE>" + Instancenumber + "</INSTANCE>"
-//                                    + "<IP>" + HOST + "</IP><CHECKSUM>" + checksum + "</CHECKSUM></Body>";
                             byte[] bytes = sendmsg.getBytes("UTF-8");
                             outToServer.writeInt(bytes.length);
                             outToServer.write(bytes);
@@ -583,7 +565,7 @@ public class SIPS implements Serializable {
             }
             try {
                 s = new Socket();
-                s.connect(new InetSocketAddress(HOST, 13131));
+                s.connect(new InetSocketAddress(HOST, fileServerPort));
                 OutputStream os = s.getOutputStream();
                 ObjectOutputStream inStream;
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
@@ -697,25 +679,25 @@ public class SIPS implements Serializable {
 
     public static boolean isWindows() {
 
-        return (OS.indexOf("win") >= 0);
+        return (OS.contains("win"));
 
     }
 
     public static boolean isMac() {
 
-        return (OS.indexOf("mac") >= 0);
+        return (OS.contains("mac"));
 
     }
 
     public static boolean isUnix() {
 
-        return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
+        return (OS.contains("nix") || OS.contains("nux") || OS.indexOf("aix") > 0);
 
     }
 
     public static boolean isSolaris() {
 
-        return (OS.indexOf("sunos") >= 0);
+        return (OS.contains("sunos"));
 
     }
 
