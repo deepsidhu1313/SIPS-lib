@@ -263,27 +263,19 @@ public class SIPS implements Serializable {
         //   Socket s = null;
         String workingDir = System.getProperty("user.dir");
         System.out.println("Current working directory : " + workingDir);
-        if (workingDir.contains("-ID-")) {
-            if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
+//        if (workingDir.contains("-ID-"))
+        {
 
-            } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
-            }
             String lchecksum = "";
             String path = null;
             String checksum = null;
             File ipDir, ip2Dir = null;
-            JSONObject meta = tools.readJSONFile(workingDir + "/meta.json");
-            ID = meta.getString("JOB_TOKEN", ID);
-            HOST = meta.getString("SENDER_IP", HOST);
-            CNO = meta.getString("CHUNK_NO", CNO);
+            JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+            ID = meta.getString("JOB_TOKEN");
+            HOST = meta.getString("SENDER_IP");
+            CNO = meta.getString("CHUNK_NO");
             String senderUUID = meta.getString("SENDER_UUID");
+            String nodeUUID = meta.getString("UUID");
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
             try (Socket s = new Socket(HOST, fileServerPort)) {
@@ -295,16 +287,17 @@ public class SIPS implements Serializable {
                     body.put("CLASSNAME", ClassName);
                     body.put("OBJECT", objectname);
                     body.put("INSTANCE", Instancenumber);
+                    body.put("PROJECT", projectName);
                     JSONObject msg = new JSONObject();
                     msg.put("Command", "resolveObjectChecksum");
-                    msg.put("body", body);
+                    msg.put("Body", body);
                     String sendmsg = msg.toString(2);
 
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
                     outToServer.write(bytes);
 
-                    path = homeDir + "/.simulated/" + ClassName + "/";
+                    path = homeDir + "/.build/.simulated/" + ClassName + "/";
                     path += "" + objectname + "-instance-" + Instancenumber + ".obj";
 
                     try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
@@ -322,7 +315,7 @@ public class SIPS implements Serializable {
                             ipDir.mkdirs();
                         }
 //String filename = new File(_item).getName();
-                        ip2Dir = new File(ipDir.getAbsolutePath() + "/" + path);
+                        ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
                         if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                             lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
                         }
@@ -374,8 +367,8 @@ public class SIPS implements Serializable {
 
                             JSONObject msg = new JSONObject();
                             msg.put("Command", "downloadObject");
-                            msg.put("body", body);
-                            String sendmsg = msg.toString(2);
+                            msg.put("Body", body);
+                            String sendmsg = msg.toString();
 
                             byte[] bytes = sendmsg.getBytes("UTF-8");
                             outToServer.writeInt(bytes.length);
@@ -425,7 +418,7 @@ public class SIPS implements Serializable {
             /*New Logic While wala*/
             long endTime = System.currentTimeMillis();
 
-            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, ID, CNO, "", "" + (endTime - starttime)));
+            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, ID, CNO, "", "" + (endTime - starttime), nodeUUID));
             t2.start();
             //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
             //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
