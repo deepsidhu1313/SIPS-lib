@@ -16,11 +16,7 @@
  */
 package in.co.s13.sips.lib.common.datastructure;
 
-import static in.co.s13.sips.lib.common.settings.GlobalValues.ADJACENT_NODES_TABLE;
-import static in.co.s13.sips.lib.common.settings.GlobalValues.NON_ADJACENT_NODES_TABLE;
 import java.util.ArrayList;
-import java.util.Objects;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -94,4 +90,6 @@ public interface Node {
     public JSONObject toJSON();
 
     public boolean equals(Object obj);
+    
+    public double getCPUScore();
 }

@@ -27,7 +27,7 @@ import org.json.JSONObject;
 public class LiveNode implements Node {
 
     private int task_limit, waiting_in_que;
-    private String uuid, operatingSytem, hostname, processor_name;
+    private String uuid, operatingSytem, hostname = "", processor_name;
 
     private long memory, free_memory, hdd_size, hdd_free, lastCheckedOn, lastCheckAgo;
     private ArrayList<String> ipAddresses = new ArrayList<>();
@@ -182,6 +182,10 @@ public class LiveNode implements Node {
 
     public JSONObject getBenchmarking_results() {
         return benchmarking_results;
+    }
+
+    public double getCPUScore() {
+        return this.getBenchmarking_results().getDouble("Composite Score", Double.MIN_VALUE);
     }
 
     public void setBenchmarking_results(JSONObject benchmarking_results) {
