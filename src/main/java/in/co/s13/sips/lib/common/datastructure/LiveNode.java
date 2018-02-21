@@ -185,7 +185,7 @@ public class LiveNode implements Node {
     }
 
     public double getCPUScore() {
-        return this.getBenchmarking_results().getDouble("Composite Score", Double.MIN_VALUE);
+        return this.getBenchmarking_results().getJSONObject("CPU").getJSONObject("Benchmarks").getDouble("Composite Score");
     }
 
     public void setBenchmarking_results(JSONObject benchmarking_results) {
