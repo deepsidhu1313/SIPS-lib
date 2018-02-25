@@ -17,6 +17,7 @@
 package in.co.s13.sips.lib.common.datastructure;
 
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentMap;
 import org.json.JSONObject;
 
 /**
@@ -53,9 +54,9 @@ public interface Node {
 
     public void setFree_memory(long free_memory);
 
-    public ArrayList<String> getIpAddresses();
+    public ConcurrentMap<String, IPAddress> getIpAddresses();
 
-    public void setIpAddresses(ArrayList<String> ipAddresses);
+    public void setIpAddresses(ConcurrentMap<String, IPAddress> ipAddresses);
 
     public String getProcessor_name();
 
@@ -69,9 +70,11 @@ public interface Node {
 
     public void setHdd_free(long hdd_free);
 
-    public void addIp(String ip);
+    public void addIP(String ip);
 
-    public boolean removeIp(String ip);
+    public IPAddress removeIp(String ip);
+
+    public IPAddress getIP(String ip);
 
     public JSONObject getBenchmarking_results();
 
@@ -90,6 +93,6 @@ public interface Node {
     public JSONObject toJSON();
 
     public boolean equals(Object obj);
-    
+
     public double getCPUScore();
 }
