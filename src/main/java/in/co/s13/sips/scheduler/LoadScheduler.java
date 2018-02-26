@@ -23,6 +23,7 @@ import in.co.s13.sips.lib.common.datastructure.Node;
 import in.co.s13.sips.lib.common.datastructure.ParallelForLoop;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
 
 /**
@@ -42,7 +43,7 @@ public class LoadScheduler implements Serializable {
         return scheduler.schedule(); //To change body of generated methods, choose Tools | Templates.
     }
 
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ArrayList<Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings) {
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String,Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings) {
         return scheduler.scheduleParallelFor(nodes, loop, schedulerSettings);
     }
 
