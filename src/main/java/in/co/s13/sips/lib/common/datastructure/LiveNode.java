@@ -34,9 +34,10 @@ public class LiveNode implements Node {
     private ConcurrentMap<String, IPAddress> ipAddresses = new ConcurrentHashMap<>();
     private JSONObject benchmarking_results;
     private long distanceFromCurrent;
+    private double cpuAvgLoad;
 
     public LiveNode(String uuid, String host, String os, String processor, int task_limit,
-            int qwait, long ram, long free_memory, long hdd_size, long hdd_free, JSONObject benchmarking_results, long lastCheckedOn) {
+            int qwait, long ram, long free_memory, long hdd_size, long hdd_free, JSONObject benchmarking_results, long lastCheckedOn, double cpuAvgLoad) {
         this.uuid = uuid;
         this.operatingSytem = os;
         this.hostname = host;
@@ -49,6 +50,7 @@ public class LiveNode implements Node {
         this.hdd_free = hdd_free;
         this.benchmarking_results = benchmarking_results;
         this.lastCheckedOn = lastCheckedOn;
+        this.cpuAvgLoad = cpuAvgLoad;
     }
 
     public LiveNode(JSONObject livedbRow) {
@@ -72,9 +74,19 @@ public class LiveNode implements Node {
             addIP(ip);
             this.ipAddresses.get(ip).setPingScore(ipAdd.getLong("pingScore", 0L));
         }
+        cpuAvgLoad = livedbRow.getDouble("CPULOAD", Double.MAX_VALUE);
+
         benchmarking_results = livedbRow.getJSONObject("benchmarking_results");
         lastCheckAgo = livedbRow.getLong("lastCheckAgo");
         lastCheckedOn = System.currentTimeMillis() - lastCheckAgo;
+    }
+
+    public double getCpuAvgLoad() {
+        return cpuAvgLoad;
+    }
+
+    public void setCpuAvgLoad(double cpuAvgLoad) {
+        this.cpuAvgLoad = cpuAvgLoad;
     }
 
     @Override
@@ -273,6 +285,7 @@ public class LiveNode implements Node {
         result.put("operatingSytem", operatingSytem);
         result.put("hostname", hostname);
         result.put("processor_name", processor_name);
+        result.put("CPULOAD", cpuAvgLoad);
         result.put("memory", memory);
         result.put("free_memory", free_memory);
         result.put("hdd_size", hdd_size);
@@ -388,6 +401,14 @@ public class LiveNode implements Node {
             public int compare(Node o1, Node o2) {
                 double speed1 = o1.getBenchmarking_results().getJSONObject("CPU").getJSONObject("Benchmarks").getDouble("Composite Score");
                 double speed2 = o2.getBenchmarking_results().getJSONObject("CPU").getJSONObject("Benchmarks").getDouble("Composite Score");
+                return Double.valueOf(speed1).compareTo(speed2);
+            }
+        },
+        CPU_AVG_LOAD {
+            @Override
+            public int compare(Node o1, Node o2) {
+                double speed1 = o1.getCpuAvgLoad();
+                double speed2 = o2.getCpuAvgLoad();
                 return Double.valueOf(speed1).compareTo(speed2);
             }
         },

@@ -95,4 +95,7 @@ public interface Node {
     public boolean equals(Object obj);
 
     public double getCPUScore();
+    
+    public double getCpuAvgLoad();
+    public void setCpuAvgLoad(double cpuAvgLoad);
 }

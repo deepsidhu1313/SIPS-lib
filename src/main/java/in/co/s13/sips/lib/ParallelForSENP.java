@@ -28,12 +28,17 @@ public class ParallelForSENP {
 
     public ParallelForSENP() {
     }
-    
-    
+
     public ParallelForSENP(String start, String end, String nodeUUID) {
         this.start = start;
         this.end = end;
         this.nodeUUID = nodeUUID;
+    }
+
+    public ParallelForSENP(ParallelForSENP other) {
+        this.start = other.start;
+        this.end = other.end;
+        this.nodeUUID = other.nodeUUID;
     }
 
     public String getStart() {
