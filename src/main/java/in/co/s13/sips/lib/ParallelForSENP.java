@@ -24,21 +24,24 @@ import org.json.JSONObject;
  */
 public class ParallelForSENP {
 
-    private String start, end, nodeUUID;
+    private String start, end, nodeUUID,diff;
 
     public ParallelForSENP() {
     }
 
-    public ParallelForSENP(String start, String end, String nodeUUID) {
+    public ParallelForSENP(String start, String end, String nodeUUID,String diff) {
         this.start = start;
         this.end = end;
         this.nodeUUID = nodeUUID;
+        this.diff=diff;
     }
 
     public ParallelForSENP(ParallelForSENP other) {
         this.start = other.start;
         this.end = other.end;
         this.nodeUUID = other.nodeUUID;
+        this.diff=other.diff;
+                
     }
 
     public String getStart() {
@@ -65,6 +68,16 @@ public class ParallelForSENP {
         this.nodeUUID = nodeUUID;
     }
 
+    public String getDiff() {
+        return diff;
+    }
+
+    public void setDiff(String diff) {
+        this.diff = diff;
+    }
+    
+    
+
     @Override
     public String toString() {
         return toJSON().toString();
@@ -79,6 +92,7 @@ public class ParallelForSENP {
         json.put("start", start);
         json.put("end", end);
         json.put("nodeUUID", nodeUUID);
+        json.put("diff", diff);
         return json;
     }
 
