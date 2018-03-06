@@ -46,5 +46,9 @@ public class LoadScheduler implements Serializable {
     public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String,Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings) {
         return scheduler.scheduleParallelFor(nodes, loop, schedulerSettings);
     }
+    
+     public int getTotalNodes(){
+     return scheduler.getTotalNodes();
+     }
 
 }

@@ -29,6 +29,11 @@ import org.json.JSONObject;
  * @author nika
  */
 public interface Scheduler {
+
     public ArrayList<TaskNodePair> schedule();
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String,Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings);
+
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings);
+
+    public int getTotalNodes();
+
 }
