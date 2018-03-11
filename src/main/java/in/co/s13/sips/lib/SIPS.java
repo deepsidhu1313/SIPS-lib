@@ -286,6 +286,7 @@ public class SIPS implements Serializable {
                     body.put("CNO", CNO);
                     body.put("CLASSNAME", ClassName);
                     body.put("OBJECT", objectname);
+                    body.put("UUID", nodeUUID);
                     body.put("INSTANCE", Instancenumber);
                     body.put("PROJECT", projectName);
                     JSONObject msg = new JSONObject();
