@@ -50,7 +50,7 @@ public class SIPS implements Serializable {
     String simDBLoc = "", parsedCodeDBLoc = "";
     public static String OS = System.getProperty("os.name").toLowerCase();
     public static int OS_Name = 0;
-    String HOST, ID, CNO, ClassName;
+    String HOST, PID, CNO, ClassName;
 
     String homeDir = System.getProperty("user.dir");
 
@@ -176,12 +176,12 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
@@ -194,7 +194,7 @@ public class SIPS implements Serializable {
                 JSONObject msg = new JSONObject();
                 msg.put("Command", "breakLoop");
                 JSONObject body = new JSONObject();
-                body.put("PID", ID);
+                body.put("PID", PID);
                 body.put("CNO", CNO);
                 msg.put("body", body);
                 String sendmsg = msg.toString(2);
@@ -263,7 +263,7 @@ public class SIPS implements Serializable {
         //   Socket s = null;
         String workingDir = System.getProperty("user.dir");
         System.out.println("Current working directory : " + workingDir);
-//        if (workingDir.contains("-ID-"))
+//        if (workingDir.contains("-PID-"))
         {
 
             String lchecksum = "";
@@ -271,7 +271,7 @@ public class SIPS implements Serializable {
             String checksum = null;
             File ipDir, ip2Dir = null;
             JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
-            ID = meta.getString("JOB_TOKEN");
+            PID = meta.getString("JOB_TOKEN");
             HOST = meta.getString("SENDER_IP");
             CNO = meta.getString("CHUNK_NO");
             String senderUUID = meta.getString("SENDER_UUID");
@@ -282,7 +282,7 @@ public class SIPS implements Serializable {
                 OutputStream os = s.getOutputStream();
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
                     JSONObject body = new JSONObject();
-                    body.put("PID", ID);
+                    body.put("PID", PID);
                     body.put("CNO", CNO);
                     body.put("CLASSNAME", ClassName);
                     body.put("OBJECT", objectname);
@@ -341,7 +341,7 @@ public class SIPS implements Serializable {
             /*New Logic While wala*/
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
-
+            boolean downloading = false;
             while (Ndownloaded) {
                 String nmsg = "";
                 if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
@@ -349,14 +349,16 @@ public class SIPS implements Serializable {
                 }
                 if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                     util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
+                    Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0));
+                    sendCacheHitThread.start();
                     Ndownloaded = false;
                 } else {
-
+                    downloading = true;
                     try (Socket sock = new Socket("127.0.0.1", fileDownloadServerPort)) {
                         //System.out.println("Connecting...");
                         try (OutputStream os = sock.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
                             JSONObject body = new JSONObject();
-                            body.put("PID", ID);
+                            body.put("PID", PID);
                             body.put("CNO", CNO);
                             body.put("CLASSNAME", ClassName);
                             body.put("OBJECT", objectname);
@@ -418,8 +420,10 @@ public class SIPS implements Serializable {
 
             /*New Logic While wala*/
             long endTime = System.currentTimeMillis();
+            Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / endTime - starttime));
+            sendCacheMissThread.start();
 
-            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, ID, CNO, "", "" + (endTime - starttime), nodeUUID));
+            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, PID, CNO, "", "" + (endTime - starttime), nodeUUID));
             t2.start();
             //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
             //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
@@ -440,15 +444,15 @@ public class SIPS implements Serializable {
      Socket s = null;
      String workingDir = System.getProperty("user.dir");
      //System.out.println("Current working directory : " + workingDir);
-     if (workingDir.contains("-ID-")) {
+     if (workingDir.contains("-PID-")) {
      if (OS_Name == 2) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-     ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
+     HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-PID"));
+     PID = workingDir.substring(workingDir.lastIndexOf("-PID-") + 4, workingDir.lastIndexOf("c"));
      CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
      } else if (OS_Name == 0) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-     ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("c"));
+     HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-PID"));
+     PID = workingDir.substring(workingDir.lastIndexOf("-PID-") + 4, workingDir.lastIndexOf("c"));
      CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
 
      }
@@ -459,7 +463,7 @@ public class SIPS implements Serializable {
      OutputStream os = s.getOutputStream();
      DataOutputStream outToServer = new DataOutputStream(os);
      String sendmsg = "<Command>resolveObject</Command>"
-     + "<Body><PID>" + ID + "</PID>"
+     + "<Body><PID>" + PID + "</PID>"
      + "<CNO>" + CNO + "</CNO>"
      + "<OBJECT>" + objectname + "</OBJECT>"
      + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
@@ -493,11 +497,11 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
@@ -507,7 +511,7 @@ public class SIPS implements Serializable {
                     OutputStream os = s.getOutputStream();
                     try (DataOutputStream outToServer = new DataOutputStream(os)) {
                         JSONObject body = new JSONObject();
-                        body.put("PID", ID);
+                        body.put("PID", PID);
                         body.put("CNO", CNO);
                         body.put("OBJECT", objectname);
                         body.put("INSTANCE", Instancenumber);
@@ -518,7 +522,7 @@ public class SIPS implements Serializable {
                         msg.put("body", body);
                         String sendmsg = msg.toString(2);
 
-//                        String sendmsg = "<Command>saveArrayElement</Command><Body><PID>" + ID + "</PID>"
+//                        String sendmsg = "<Command>saveArrayElement</Command><Body><PID>" + PID + "</PID>"
 //                                + "<CNO>" + CNO + "</CNO>"
 //                                + "<OBJECT>" + objectname + "</OBJECT>"
 //                                + "<POSITION>" + position + "</POSITION>"
@@ -549,11 +553,11 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
@@ -564,7 +568,7 @@ public class SIPS implements Serializable {
                 ObjectOutputStream inStream;
                 try (DataOutputStream outToServer = new DataOutputStream(os)) {
                     JSONObject body = new JSONObject();
-                    body.put("PID", ID);
+                    body.put("PID", PID);
                     body.put("CNO", CNO);
                     body.put("OBJECT", objectname);
                     body.put("INSTANCE", Instancenumber);
@@ -576,7 +580,7 @@ public class SIPS implements Serializable {
                     String sendmsg = msg.toString(2);
 
 //                    String sendmsg = "<Command>updateArrayElement</Command>"
-//                            + "<Body><PID>" + ID + "</PID>"
+//                            + "<Body><PID>" + PID + "</PID>"
 //                            + "<CNO>" + CNO + "</CNO>"
 //                            + "<OBJECT>" + objectname + "</OBJECT>"
 //                            + "<POSITION>" + position + "</POSITION>"
@@ -612,11 +616,11 @@ public class SIPS implements Serializable {
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
             } else if (OS_Name == 0) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                ID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
+                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
 
             }
@@ -626,7 +630,7 @@ public class SIPS implements Serializable {
                 OutputStream os = s.getOutputStream();
                 DataOutputStream outToServer = new DataOutputStream(os);
                 JSONObject body = new JSONObject();
-                body.put("PID", ID);
+                body.put("PID", PID);
                 body.put("CNO", CNO);
                 body.put("OBJECT", objectname);
                 body.put("INSTANCE", Instancenumber);
@@ -638,7 +642,7 @@ public class SIPS implements Serializable {
                 String sendmsg = msg.toString(2);
 
 //                String sendmsg = "<Command>resolveArrayElement</Command>"
-//                        + "<Body><PID>" + ID + "</PID>"
+//                        + "<Body><PID>" + PID + "</PID>"
 //                        + "<CNO>" + CNO + "</CNO>"
 //                        + "<OBJECT>" + objectname + "</OBJECT>"
 //                        + "<POSITION>" + position + "</POSITION>"

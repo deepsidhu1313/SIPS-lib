@@ -16,7 +16,6 @@
  */
 package in.co.s13.sips.lib;
 
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -29,19 +28,21 @@ import org.json.JSONObject;
  *
  * @author Nika
  */
-public class sendCommOverHead implements Runnable {
+public class sendCacheMiss implements Runnable {
 
-    String ipadd = "", ID = "", outPut = "", filename = "", value = "", cmd, chunkno, nodeUUID;
-    int taskServerPort = 13133;
+    private String ipadd, PID, chunkno, nodeUUID, senderUUID;
+    private int taskServerPort = 13133;
+    private long dataSize;
+    private double speed;
 
-    public sendCommOverHead(String overheadName, String ip, String PID, String chunknumber, String Filename, String value, String currentNodeUUID) {
-        ipadd = ip;
-        ID = PID;
-        filename = Filename;
-        this.value = value;
-        cmd = overheadName;
-        chunkno = chunknumber;
-        nodeUUID = currentNodeUUID;
+    public sendCacheMiss(String ipadd, String PID, String chunkno, String nodeUUID, String senderUUID, long dataSize, double speed) {
+        this.ipadd = ipadd;
+        this.PID = PID;
+        this.chunkno = chunkno;
+        this.nodeUUID = nodeUUID;
+        this.senderUUID = senderUUID;
+        this.dataSize = dataSize;
+        this.speed = speed;
     }
 
     @Override
@@ -49,36 +50,34 @@ public class sendCommOverHead implements Runnable {
 
         try (Socket s = new Socket(ipadd, taskServerPort); OutputStream os = s.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
             JSONObject sendmsgJsonObj = new JSONObject();
-            sendmsgJsonObj.put("Command", cmd);
+            sendmsgJsonObj.put("Command", "CACHEMISS");
             JSONObject sendmsgBodyJsonObj = new JSONObject();
-            sendmsgBodyJsonObj.put("PID", ID);
+            sendmsgBodyJsonObj.put("PID", PID);
             sendmsgBodyJsonObj.put("UUID", nodeUUID);
+            sendmsgBodyJsonObj.put("SENDER_UUID", senderUUID);
             sendmsgBodyJsonObj.put("CNO", chunkno);
-            sendmsgBodyJsonObj.put("FILENAME", filename);
-            sendmsgBodyJsonObj.put("OUTPUT", value);
+            sendmsgBodyJsonObj.put("SIZE", dataSize);
+            sendmsgBodyJsonObj.put("SPEED", speed);
             sendmsgJsonObj.put("Body", sendmsgBodyJsonObj);
             String sendmsg = sendmsgJsonObj.toString();
 
             byte[] bytes = sendmsg.getBytes("UTF-8");
             outToServer.writeInt(bytes.length);
             outToServer.write(bytes);
-            try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
-                int length = dIn.readInt();                    // read length of incoming message
-                byte[] message = new byte[length];
-
-                if (length > 0) {
-                    dIn.readFully(message, 0, message.length); // read the message
-                }
-                String reply = new String(message);
-                if (reply.contains("OK")) {
-                } else {
-                }
-
-            } // read length of incoming message
-
+//            try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
+//                int length = dIn.readInt();                    // read length of incoming message
+//                byte[] message = new byte[length];
+//
+//                if (length > 0) {
+//                    dIn.readFully(message, 0, message.length); // read the message
+//                }
+//                String reply = new String(message);
+//                if (reply.contains("OK")) {
+//                } else {
+//                }
+//            } // read length of incoming message
         } catch (IOException ex) {
-            Logger.getLogger(sendCommOverHead.class.getName()).log(Level.SEVERE, null, ex);
-
+            Logger.getLogger(sendCacheMiss.class.getName()).log(Level.SEVERE, null, ex);
         }
 
     }
