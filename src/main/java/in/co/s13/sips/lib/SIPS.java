@@ -342,6 +342,16 @@ public class SIPS implements Serializable {
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
             boolean downloading = false;
+            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+            }
+            if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+                util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0));
+                sendCacheHitThread.start();
+                Ndownloaded = false;
+            }
+
             while (Ndownloaded) {
                 String nmsg = "";
                 if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
@@ -349,11 +359,9 @@ public class SIPS implements Serializable {
                 }
                 if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                     util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
-                    Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0));
-                    sendCacheHitThread.start();
                     Ndownloaded = false;
                 } else {
-                    downloading = true;
+
                     try (Socket sock = new Socket("127.0.0.1", fileDownloadServerPort)) {
                         //System.out.println("Connecting...");
                         try (OutputStream os = sock.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
@@ -404,6 +412,7 @@ public class SIPS implements Serializable {
 
                                 } else if (rpl.equalsIgnoreCase("addedinq")) {
                                     sock.close();
+                                    downloading = true;
                                 } else {
                                     System.out.println("Couldn't find file");
                                 }
@@ -420,9 +429,12 @@ public class SIPS implements Serializable {
 
             /*New Logic While wala*/
             long endTime = System.currentTimeMillis();
-            Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / endTime - starttime));
-            sendCacheMissThread.start();
-
+            if (downloading) {
+                long totalTime = endTime - starttime;
+                totalTime=((totalTime < 1000) ? 1000 : totalTime);
+                Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / ((totalTime) / 1000)));
+                sendCacheMissThread.start();
+            }
             Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, PID, CNO, "", "" + (endTime - starttime), nodeUUID));
             t2.start();
             //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
