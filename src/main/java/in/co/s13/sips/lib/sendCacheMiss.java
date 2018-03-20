@@ -32,10 +32,10 @@ public class sendCacheMiss implements Runnable {
 
     private String ipadd, PID, chunkno, nodeUUID, senderUUID;
     private int taskServerPort = 13133;
-    private long dataSize;
+    private long dataSize, commOH, sleepTime;
     private double speed;
 
-    public sendCacheMiss(String ipadd, String PID, String chunkno, String nodeUUID, String senderUUID, long dataSize, double speed) {
+    public sendCacheMiss(String ipadd, String PID, String chunkno, String nodeUUID, String senderUUID, long dataSize, double speed, long commOH, long sleepTime) {
         this.ipadd = ipadd;
         this.PID = PID;
         this.chunkno = chunkno;
@@ -43,6 +43,8 @@ public class sendCacheMiss implements Runnable {
         this.senderUUID = senderUUID;
         this.dataSize = dataSize;
         this.speed = speed;
+        this.commOH = commOH;
+        this.sleepTime = sleepTime;
     }
 
     @Override
@@ -58,6 +60,8 @@ public class sendCacheMiss implements Runnable {
             sendmsgBodyJsonObj.put("CNO", chunkno);
             sendmsgBodyJsonObj.put("SIZE", dataSize);
             sendmsgBodyJsonObj.put("SPEED", speed);
+            sendmsgBodyJsonObj.put("COMM_OH", commOH);
+            sendmsgBodyJsonObj.put("SLEEP_TIME", sleepTime);
             sendmsgJsonObj.put("Body", sendmsgBodyJsonObj);
             String sendmsg = sendmsgJsonObj.toString();
 

@@ -347,11 +347,11 @@ public class SIPS implements Serializable {
             }
             if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                 util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
-                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0));
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0,0));
                 sendCacheHitThread.start();
                 Ndownloaded = false;
             }
-
+            long totalSleepTime = 0;
             while (Ndownloaded) {
                 String nmsg = "";
                 if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
@@ -409,6 +409,7 @@ public class SIPS implements Serializable {
                                     Long vl = reply.getLong("RT");//substring(reply.indexOf("<RT>") + 4, reply.indexOf("</RT>"));
                                     sock.close();
                                     Thread.currentThread().sleep((vl) + 10);
+                                    totalSleepTime += vl;
                                     if (!iRequestedFile) {
                                         alreadyInQue = true;
                                     }
@@ -434,12 +435,12 @@ public class SIPS implements Serializable {
             if (iRequestedFile && !alreadyInQue) {
 
                 long totalTime = endTime - starttime;
-                Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / (double) ((double) (totalTime) / 1000)));
+                Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / (double) ((double) (totalTime) / 1000), (endTime - starttime), totalSleepTime));
                 sendCacheMissThread.start();
             }
 
             if (alreadyInQue) {
-                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0));
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, (endTime - starttime), totalSleepTime));
                 sendCacheHitThread.start();
 
             }

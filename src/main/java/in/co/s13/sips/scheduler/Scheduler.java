@@ -34,6 +34,9 @@ public interface Scheduler {
 
     public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings);
 
+    public ArrayList<Node> getBackupNodes();
+
+    
     public int getTotalNodes();
 
 }

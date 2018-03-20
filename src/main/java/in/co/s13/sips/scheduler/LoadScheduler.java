@@ -43,12 +43,16 @@ public class LoadScheduler implements Serializable {
         return scheduler.schedule(); //To change body of generated methods, choose Tools | Templates.
     }
 
-    public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String,Node> nodes,ParallelForLoop loop,JSONObject schedulerSettings) {
+    public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings) {
         return scheduler.scheduleParallelFor(nodes, loop, schedulerSettings);
     }
-    
-     public int getTotalNodes(){
-     return scheduler.getTotalNodes();
-     }
+
+    public int getTotalNodes() {
+        return scheduler.getTotalNodes();
+    }
+
+    public ArrayList<Node> getBackupNodes() {
+        return scheduler.getBackupNodes();
+    }
 
 }
