@@ -55,4 +55,8 @@ public class LoadScheduler implements Serializable {
         return scheduler.getBackupNodes();
     }
 
+    public int getTotalChunks() {
+        return scheduler.getTotalChunks();
+    }
+
 }

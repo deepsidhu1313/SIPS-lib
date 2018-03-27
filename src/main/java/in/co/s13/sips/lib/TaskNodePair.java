@@ -16,6 +16,7 @@
  */
 package in.co.s13.sips.lib;
 
+import java.util.ArrayList;
 import org.json.JSONObject;
 
 /**
@@ -24,8 +25,8 @@ import org.json.JSONObject;
  */
 public class TaskNodePair {
 
-    private String taskID, nodeUUID;
-
+    private String taskID, nodeUUID,duplicateOf;
+    private ArrayList<String> duplicates = new ArrayList<>();
     public TaskNodePair(String taskID, String nodeUUID) {
         this.taskID = taskID;
         this.nodeUUID = nodeUUID;
@@ -45,6 +46,39 @@ public class TaskNodePair {
 
     public void setNodeUUID(String nodeUUID) {
         this.nodeUUID = nodeUUID;
+    }
+    
+    
+    public String getId() {
+        return toString();
+    }
+
+    public ArrayList<String> getDuplicates() {
+        return duplicates;
+    }
+
+    public void setDuplicates(ArrayList<String> duplicates) {
+        this.duplicates = duplicates;
+    }
+
+    public void addDuplicate(String duplicateId) {
+        this.duplicates.add(duplicateId);
+    }
+
+    public String getDuplicateOf() {
+        return duplicateOf;
+    }
+
+    public void setDuplicateOf(String duplicateOf) {
+        this.duplicateOf = duplicateOf;
+    }
+
+    public boolean isDuplicate() {
+        return duplicateOf != null;
+    }
+
+    public boolean hasDuplicates() {
+        return duplicates.size() > 0;
     }
 
     @Override

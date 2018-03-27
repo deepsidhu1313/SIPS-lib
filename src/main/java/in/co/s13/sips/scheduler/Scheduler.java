@@ -38,5 +38,8 @@ public interface Scheduler {
 
     
     public int getTotalNodes();
+    
+    
+    public int getTotalChunks();
 
 }

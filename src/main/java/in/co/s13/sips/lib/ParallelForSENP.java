@@ -16,6 +16,7 @@
  */
 package in.co.s13.sips.lib;
 
+import java.util.ArrayList;
 import org.json.JSONObject;
 
 /**
@@ -24,24 +25,25 @@ import org.json.JSONObject;
  */
 public class ParallelForSENP {
 
-    private String start, end, nodeUUID,diff;
+    private String start, end, nodeUUID, diff, duplicateOf;
+    private ArrayList<String> duplicates = new ArrayList<>();
 
     public ParallelForSENP() {
     }
 
-    public ParallelForSENP(String start, String end, String nodeUUID,String diff) {
+    public ParallelForSENP(String start, String end, String nodeUUID, String diff) {
         this.start = start;
         this.end = end;
         this.nodeUUID = nodeUUID;
-        this.diff=diff;
+        this.diff = diff;
     }
 
     public ParallelForSENP(ParallelForSENP other) {
         this.start = other.start;
         this.end = other.end;
         this.nodeUUID = other.nodeUUID;
-        this.diff=other.diff;
-                
+        this.diff = other.diff;
+
     }
 
     public String getStart() {
@@ -75,8 +77,38 @@ public class ParallelForSENP {
     public void setDiff(String diff) {
         this.diff = diff;
     }
-    
-    
+
+    public String getId() {
+        return toString();
+    }
+
+    public ArrayList<String> getDuplicates() {
+        return duplicates;
+    }
+
+    public void setDuplicates(ArrayList<String> duplicates) {
+        this.duplicates = duplicates;
+    }
+
+    public void addDuplicate(String duplicateId) {
+        this.duplicates.add(duplicateId);
+    }
+
+    public String getDuplicateOf() {
+        return duplicateOf;
+    }
+
+    public void setDuplicateOf(String duplicateOf) {
+        this.duplicateOf = duplicateOf;
+    }
+
+    public boolean isDuplicate() {
+        return duplicateOf != null;
+    }
+
+    public boolean hasDuplicates() {
+        return duplicates.size() > 0;
+    }
 
     @Override
     public String toString() {
