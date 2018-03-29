@@ -27,11 +27,13 @@ public class ParallelForSENP {
 
     private String start, end, nodeUUID, diff, duplicateOf;
     private ArrayList<String> duplicates = new ArrayList<>();
+    private int chunkNo;
 
     public ParallelForSENP() {
     }
 
-    public ParallelForSENP(String start, String end, String nodeUUID, String diff) {
+    public ParallelForSENP(int chunkNo, String start, String end, String nodeUUID, String diff) {
+        this.chunkNo = chunkNo;
         this.start = start;
         this.end = end;
         this.nodeUUID = nodeUUID;
@@ -39,6 +41,8 @@ public class ParallelForSENP {
     }
 
     public ParallelForSENP(ParallelForSENP other) {
+        this.chunkNo = other.chunkNo;
+
         this.start = other.start;
         this.end = other.end;
         this.nodeUUID = other.nodeUUID;
@@ -110,6 +114,14 @@ public class ParallelForSENP {
         return duplicates.size() > 0;
     }
 
+    public int getChunkNo() {
+        return chunkNo;
+    }
+
+    public void setChunkNo(int chunkNo) {
+        this.chunkNo = chunkNo;
+    }
+
     @Override
     public String toString() {
         return toJSON().toString();
@@ -121,6 +133,7 @@ public class ParallelForSENP {
 
     public JSONObject toJSON() {
         JSONObject json = new JSONObject();
+        json.put("chunkNo", chunkNo);
         json.put("start", start);
         json.put("end", end);
         json.put("nodeUUID", nodeUUID);
