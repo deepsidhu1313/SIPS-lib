@@ -50,6 +50,10 @@ public class LoadScheduler implements Serializable {
     public int getTotalNodes() {
         return scheduler.getTotalNodes();
     }
+    
+    public int getSelectedNodes() {
+        return scheduler.getSelectedNodes();
+    }
 
     public ArrayList<Node> getBackupNodes() {
         return scheduler.getBackupNodes();

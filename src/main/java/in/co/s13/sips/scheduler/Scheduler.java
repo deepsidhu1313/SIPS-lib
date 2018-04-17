@@ -36,10 +36,10 @@ public interface Scheduler {
 
     public ArrayList<Node> getBackupNodes();
 
-    
     public int getTotalNodes();
-    
-    
+
     public int getTotalChunks();
+
+    public int getSelectedNodes();
 
 }

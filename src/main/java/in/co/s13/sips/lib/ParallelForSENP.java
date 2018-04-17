@@ -42,11 +42,12 @@ public class ParallelForSENP {
 
     public ParallelForSENP(ParallelForSENP other) {
         this.chunkNo = other.chunkNo;
-
         this.start = other.start;
         this.end = other.end;
         this.nodeUUID = other.nodeUUID;
         this.diff = other.diff;
+        this.duplicateOf = other.duplicateOf;
+        this.duplicates = other.duplicates;
 
     }
 
@@ -138,6 +139,7 @@ public class ParallelForSENP {
         json.put("end", end);
         json.put("nodeUUID", nodeUUID);
         json.put("diff", diff);
+        json.put("duplicates", duplicates);
         return json;
     }
 
