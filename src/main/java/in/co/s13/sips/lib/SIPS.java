@@ -168,6 +168,32 @@ public class SIPS implements Serializable {
 
     }
 
+    public void sendResult(String objectName, int instance, Object obj) {
+        Thread t = new Thread(() -> {
+            try {
+                String path = homeDir + "/.result/" + ClassName + "/";
+                File df = new File(path);
+                if (!df.exists()) {
+                    df.mkdirs();
+                }
+                path += "" + objectName + "-instance-" + instance + ".obj";
+                try (FileOutputStream fos = new FileOutputStream(path); GZIPOutputStream gos = new GZIPOutputStream(fos); ObjectOutputStream oos = new ObjectOutputStream(gos)) {
+                    oos.writeObject(obj);
+                    oos.flush();
+                }
+                String path2 = path;
+                tools.getCheckSum(path2);
+                System.out.println("Saved The Object at " + path);
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        });
+        t.start();
+
+    }
+
     public void breakLoop() {
 
         Socket s = null;
@@ -347,7 +373,7 @@ public class SIPS implements Serializable {
             }
             if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                 util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
-                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0,0));
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
                 sendCacheHitThread.start();
                 Ndownloaded = false;
             }

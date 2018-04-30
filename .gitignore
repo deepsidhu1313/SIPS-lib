@@ -27,3 +27,4 @@ dist/
 sim/
 /nbproject/private/
 /target/
+.simulated
