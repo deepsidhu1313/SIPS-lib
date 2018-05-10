@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package in.co.s13.sips.lib;
+package in.co.s13.sips.lib.common.datastructure;
 
 import java.util.ArrayList;
 import org.json.JSONObject;

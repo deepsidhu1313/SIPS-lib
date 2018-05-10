@@ -99,99 +99,130 @@ public class MergeSort {
         sips.saveObject("tenth", 0, tenth);
         sips.endSimulateSection();
         long start = System.currentTimeMillis();
+
         sips.defineTask("first");
+        sips.setDuration("first", 1);
         first = (int[]) sips.resolveObject("first", 0);
         sorter.sort(first);
+        sips.sendResult("first", 1, first);
         sips.endTask("first");
 
         sips.defineTask("second");
+        sips.setDuration("second", 2);
         second = (int[]) sips.resolveObject("second", 0);
         sorter.sort(second);
+        sips.sendResult("second", 1, second);
         sips.endTask("second");
 
         sips.defineTask("third");
+        sips.setDuration("third", 3);
         third = (int[]) sips.resolveObject("third", 0);
         sorter.sort(third);
+        sips.sendResult("third", 1, third);
         sips.endTask("third");
 
         sips.defineTask("fourth");
+        sips.setDuration("fourth", 4);
         fourth = (int[]) sips.resolveObject("fourth", 0);
         sorter.sort(fourth);
+        sips.sendResult("fourth", 1, fourth);
         sips.endTask("fourth");
 
         sips.defineTask("fifth");
+        sips.setDuration("fifth", 5);
         fifth = (int[]) sips.resolveObject("fifth", 0);
         sorter.sort(fifth);
+        sips.sendResult("fifth", 1, fifth);
         sips.endTask("fifth");
 
         sips.defineTask("sixth");
+        sips.setDuration("sixth", 6);
         sixth = (int[]) sips.resolveObject("sixth", 0);
         sorter.sort(sixth);
+        sips.sendResult("sixth", 1, sixth);
         sips.endTask("sixth");
 
         sips.defineTask("seventh");
+        sips.setDuration("seventh", 7);
         seventh = (int[]) sips.resolveObject("seventh", 0);
         sorter.sort(seventh);
+        sips.sendResult("seventh", 1, seventh);
         sips.endTask("seventh");
 
         sips.defineTask("eigth");
+        sips.setDuration("eigth", 8);
         eigth = (int[]) sips.resolveObject("eigth", 0);
         sorter.sort(eigth);
+        sips.sendResult("eigth", 1, eigth);
         sips.endTask("eigth");
 
         sips.defineTask("ninth");
+        sips.setDuration("ninth", 9);
         ninth = (int[]) sips.resolveObject("ninth", 0);
         sorter.sort(ninth);
+        sips.sendResult("ninth", 1, ninth);
         sips.endTask("ninth");
 
         sips.defineTask("tenth");
+        sips.setDuration("tenth", 10);
         tenth = (int[]) sips.resolveObject("tenth", 0);
         sorter.sort(tenth);
+        sips.sendResult("tenth", 1, tenth);
         sips.endTask("tenth");
 
         sips.defineTask("1-2");
-        first = (int[]) sips.resolveObject("first", 1);
-        second = (int[]) sips.resolveObject("second", 1);
+        sips.setDuration("1-2", 3);
+        first = (int[]) sips.receiveResult("first", 1);
+        second = (int[]) sips.receiveResult("second", 1);
         int[] firstSecond = new int[first.length + second.length];
         System.arraycopy(first, 0, firstSecond, 0, first.length);
         System.arraycopy(second, 0, firstSecond, first.length, second.length);
         sorter.sort(firstSecond);
+        sips.sendResult("firstSecond", 0, firstSecond);
         sips.endTask("1-2");
 
         sips.defineTask("3-4");
-        third = (int[]) sips.resolveObject("third", 1);
-        fourth = (int[]) sips.resolveObject("fourth", 1);
+        sips.setDuration("3-4", 7);
+        third = (int[]) sips.receiveResult("third", 1);
+        fourth = (int[]) sips.receiveResult("fourth", 1);
         int[] thirdFourth = new int[third.length + fourth.length];
         System.arraycopy(third, 0, thirdFourth, 0, third.length);
         System.arraycopy(fourth, 0, thirdFourth, third.length, fourth.length);
         sorter.sort(thirdFourth);
+        sips.sendResult("thirdFourth", 0, thirdFourth);
         sips.endTask("3-4");
 
         sips.defineTask("5-6");
-        fifth = (int[]) sips.resolveObject("fifth", 1);
-        sixth = (int[]) sips.resolveObject("sixth", 1);
+        sips.setDuration("5-6", 11);
+        fifth = (int[]) sips.receiveResult("fifth", 1);
+        sixth = (int[]) sips.receiveResult("sixth", 1);
         int[] fifthSixth = new int[fifth.length + sixth.length];
         System.arraycopy(fifth, 0, fifthSixth, 0, fifth.length);
         System.arraycopy(sixth, 0, fifthSixth, fifth.length, sixth.length);
         sorter.sort(fifthSixth);
+        sips.sendResult("fifthSixth", 1, fifthSixth);
         sips.endTask("5-6");
 
         sips.defineTask("7-8");
-        seventh = (int[]) sips.resolveObject("seventh", 1);
-        eigth = (int[]) sips.resolveObject("eigth", 1);
+        sips.setDuration("7-8", 15);
+        seventh = (int[]) sips.receiveResult("seventh", 1);
+        eigth = (int[]) sips.receiveResult("eigth", 1);
         int[] sevenEigth = new int[seventh.length + eigth.length];
         System.arraycopy(seventh, 0, sevenEigth, 0, seventh.length);
         System.arraycopy(eigth, 0, sevenEigth, seventh.length, eigth.length);
         sorter.sort(sevenEigth);
+        sips.sendResult("seventhEight", 0, sevenEigth);
         sips.endTask("7-8");
 
         sips.defineTask("9-10");
-        ninth = (int[]) sips.resolveObject("ninth", 1);
-        tenth = (int[]) sips.resolveObject("tenth", 1);
+        sips.setDuration("9-10", 19);
+        ninth = (int[]) sips.receiveResult("ninth", 1);
+        tenth = (int[]) sips.receiveResult("tenth", 1);
         int[] ninthTenth = new int[ninth.length + tenth.length];
         System.arraycopy(ninth, 0, ninthTenth, 0, ninth.length);
         System.arraycopy(tenth, 0, ninthTenth, ninth.length, tenth.length);
         sorter.sort(ninthTenth);
+        sips.sendResult("ninthTenth", 0, ninthTenth);
         sips.endTask("9-10");
 
         System.out.println("Time taken to sort :" + (System.currentTimeMillis() - start));

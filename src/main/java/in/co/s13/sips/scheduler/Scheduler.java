@@ -16,10 +16,10 @@
  */
 package in.co.s13.sips.scheduler;
 
-import in.co.s13.sips.lib.ParallelForSENP;
-import in.co.s13.sips.lib.TaskNodePair;
+import in.co.s13.sips.lib.common.datastructure.ParallelForSENP;
 import in.co.s13.sips.lib.common.datastructure.Node;
 import in.co.s13.sips.lib.common.datastructure.ParallelForLoop;
+import in.co.s13.sips.lib.common.datastructure.SIPSTask;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
@@ -30,7 +30,7 @@ import org.json.JSONObject;
  */
 public interface Scheduler {
 
-    public ArrayList<TaskNodePair> schedule();
+    public ArrayList<SIPSTask> schedule(ConcurrentHashMap<String, Node> nodes, ConcurrentHashMap<String, SIPSTask> tasks, JSONObject schedulerSettings);
 
     public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings);
 

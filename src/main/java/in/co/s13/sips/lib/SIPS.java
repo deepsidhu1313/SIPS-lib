@@ -17,6 +17,8 @@
 package in.co.s13.sips.lib;
 
 import in.co.s13.SIPS.db.SQLiteJDBC;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -182,8 +184,54 @@ public class SIPS implements Serializable {
                     oos.flush();
                 }
                 String path2 = path;
-                tools.getCheckSum(path2);
-                System.out.println("Saved The Object at " + path);
+                String checksum = tools.getCheckSum(path2);
+                String workingDir = System.getProperty("user.dir");
+                JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+                PID = meta.getString("JOB_TOKEN");
+                HOST = meta.getString("SENDER_IP");
+                CNO = meta.getString("CHUNK_NO");
+                String senderUUID = meta.getString("SENDER_UUID");
+                String nodeUUID = meta.getString("UUID");
+                String projectName = meta.getString("PROJECT");
+                System.out.println("Host : " + HOST + " Port: " + fileServerPort);
+                try (Socket socket = new Socket(HOST, fileServerPort);
+                        OutputStream outputStream = socket.getOutputStream();
+                        DataOutputStream outToServer = new DataOutputStream(outputStream);
+                        DataInputStream dataInputStream = new DataInputStream(socket.getInputStream())) {
+                    JSONObject body = new JSONObject();
+                    body.put("PID", PID);
+                    body.put("CNO", CNO);
+                    body.put("CLASSNAME", ClassName);
+                    body.put("OBJECT", objectName);
+                    body.put("UUID", nodeUUID);
+                    body.put("INSTANCE", instance);
+                    body.put("PROJECT", projectName);
+                    JSONObject msg = new JSONObject();
+                    msg.put("Command", "UPLOAD_RESULT");
+                    msg.put("Body", body);
+                    String sendmsg = msg.toString(2);
+
+                    byte[] bytes = sendmsg.getBytes("UTF-8");
+                    outToServer.writeInt(bytes.length);
+                    outToServer.write(bytes);
+
+                    File fileToSend = new File(path2);
+                    long flength = fileToSend.length();
+                    outToServer.writeLong(flength);
+
+                    try (FileInputStream fis = new FileInputStream(fileToSend); BufferedInputStream bis = new BufferedInputStream(fis)) {
+                        int theByte = 0;
+                        int count;
+                        byte[] mybytearray = new byte[16 * 1024];
+                        try (BufferedOutputStream bos = new BufferedOutputStream(outputStream)) {
+                            while ((count = bis.read(mybytearray)) > -1) {
+                                bos.write(mybytearray, 0, count);
+                            }
+                            bos.flush();
+                        }
+                    }
+                }
+                System.out.println("Sent result from " + path);
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
@@ -194,9 +242,230 @@ public class SIPS implements Serializable {
 
     }
 
+    private String resolveObjectChecksum(String HOST, int fileServerPort, String objectname, String nodeUUID, String Instancenumber, String projectName, String senderUUID) {
+        String checksum = "", lchecksum;
+        String workingDir = System.getProperty("user.dir");
+        try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
+            JSONObject body = new JSONObject();
+            body.put("PID", PID);
+            body.put("CNO", CNO);
+            body.put("CLASSNAME", ClassName);
+            body.put("OBJECT", objectname);
+            body.put("UUID", nodeUUID);
+            body.put("INSTANCE", Instancenumber);
+            body.put("PROJECT", projectName);
+            JSONObject msg = new JSONObject();
+            msg.put("Command", "resolveResultChecksum");
+            msg.put("Body", body);
+            String sendmsg = msg.toString(2);
+
+            byte[] bytes = sendmsg.getBytes("UTF-8");
+            outToServer.writeInt(bytes.length);
+            outToServer.write(bytes);
+
+            try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
+                int length = dIn.readInt();                    // read length of incoming message
+                byte[] message = new byte[length];
+                if (length > 0) {
+                    dIn.readFully(message, 0, message.length); // read the message
+                }
+                String reply = new String(message);
+                System.out.println("Recieved " + reply + " from " + HOST);
+                if (reply.equalsIgnoreCase("foundobj")) {
+                    length = dIn.readInt();                    // read length of incoming message
+                    message = new byte[length];
+
+                    if (length > 0) {
+                        dIn.readFully(message, 0, message.length); // read the message
+                    }
+                    checksum = new String(message);
+                    System.out.println("CheckSum Recieved " + checksum);
+                }
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(SIPS.class
+                    .getName()).log(Level.SEVERE, null, ex);
+        }
+        return checksum;
+    }
+
+    public Object receiveResult(String objectname, int Instancenumber) {
+        return receiveResult(objectname, Instancenumber, 1000, 60);
+    }
+
+    public Object receiveResult(String objectname, int Instancenumber, long sleep, long maxTries) {
+        Object value = null;
+        String workingDir = System.getProperty("user.dir");
+        {
+
+            String lchecksum = "";
+            String path = "";
+            String checksum = "";
+            File ipDir, ip2Dir = null;
+            JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+            PID = meta.getString("JOB_TOKEN");
+            HOST = meta.getString("SENDER_IP");
+            CNO = meta.getString("CHUNK_NO");
+            String senderUUID = meta.getString("SENDER_UUID");
+            String nodeUUID = meta.getString("UUID");
+            String projectName = meta.getString("PROJECT");
+            System.out.println("Host : " + HOST + " Port: " + fileServerPort);
+            path = homeDir + "/.result/" + ClassName + "/";
+            path += "" + objectname + "-instance-" + Instancenumber + ".obj";
+
+            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
+            int tries = 0;
+            while (checksum.trim().length() < 1) {
+                if (tries >= maxTries) {
+                    System.err.println("Ran out of tries !!!!\n\t\t Either Result is not on Master Node or hasn't been uploaded yet!"
+                            + "\n\t\t If you think your data flow is correct, try increasing maxTries parameter or/and sleep parameter"
+                            + "\n\t\t Returning null for now");
+                    return value;
+                }
+                try {
+                    Thread.sleep(sleep);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
+                tries++;
+            }
+            String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
+            ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+            if (!ipDir.exists()) {
+                ipDir.mkdirs();
+            }
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/.result/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
+            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+            }
+            boolean Ndownloaded = true;
+            long starttime = System.currentTimeMillis();
+            boolean iRequestedFile = false, alreadyInQue = false;
+            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+            }
+            if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+                util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
+                sendCacheHitThread.start();
+                Ndownloaded = false;
+            }
+            long totalSleepTime = 0;
+            while (Ndownloaded) {
+                String nmsg = "";
+                if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                    lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+                }
+                if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+                    util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
+                    Ndownloaded = false;
+                } else {
+
+                    try (Socket sock = new Socket("127.0.0.1", fileDownloadServerPort)) {
+                        //System.out.println("Connecting...");
+                        try (OutputStream os = sock.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
+                            JSONObject body = new JSONObject();
+                            body.put("PID", PID);
+                            body.put("CNO", CNO);
+                            body.put("CLASSNAME", ClassName);
+                            body.put("OBJECT", objectname);
+                            body.put("INSTANCE", Instancenumber);
+                            body.put("IP", HOST);
+                            body.put("UUID", senderUUID);
+                            body.put("PROJECT", projectName);
+                            body.put("CHECKSUM", checksum);
+
+                            JSONObject msg = new JSONObject();
+                            msg.put("Command", "downloadResult");
+                            msg.put("Body", body);
+                            String sendmsg = msg.toString();
+
+                            byte[] bytes = sendmsg.getBytes("UTF-8");
+                            outToServer.writeInt(bytes.length);
+                            outToServer.write(bytes);
+                            try (DataInputStream dIn = new DataInputStream(sock.getInputStream())) {
+                                int length = dIn.readInt();                    // read length of incoming message
+                                byte[] message = new byte[length];
+
+                                if (length > 0) {
+                                    dIn.readFully(message, 0, message.length); // read the message
+                                }
+                                JSONObject reply = new JSONObject(new String(message));
+                                String rpl = reply.getString("MSG");//substring(reply.indexOf("<MSG>") + 5, reply.indexOf("</MSG>"));
+                                if (rpl.equalsIgnoreCase("finished")) {
+                                    // receive file
+
+                                    sock.close();
+                                    if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                                        lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+                                    }
+                                    if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+                                        util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
+                                        Ndownloaded = false;
+                                    }
+
+                                } else if (rpl.equalsIgnoreCase("inque")) {
+                                    Long vl = reply.getLong("RT");//substring(reply.indexOf("<RT>") + 4, reply.indexOf("</RT>"));
+                                    sock.close();
+                                    Thread.currentThread().sleep((vl) + 10);
+                                    totalSleepTime += vl;
+                                    if (!iRequestedFile) {
+                                        alreadyInQue = true;
+                                    }
+                                } else if (rpl.equalsIgnoreCase("addedinq")) {
+                                    sock.close();
+                                    iRequestedFile = true;
+                                } else {
+                                    System.out.println("Couldn't find file");
+
+                                }
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(SIPS.class
+                                        .getName()).log(Level.SEVERE, null, ex);
+
+                            }
+                        }
+                    } catch (IOException ex) {
+                        Logger.getLogger(SIPS.class
+                                .getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+
+            /*New Logic While wala*/
+            long endTime = System.currentTimeMillis();
+            if (iRequestedFile && !alreadyInQue) {
+                long totalTime = endTime - starttime;
+                Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / (double) ((double) (totalTime) / 1000), (endTime - starttime), totalSleepTime));
+                sendCacheMissThread.start();
+            }
+            if (alreadyInQue) {
+                Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, (endTime - starttime), totalSleepTime));
+                sendCacheHitThread.start();
+            }
+            Thread t2 = new Thread(new sendCommOverHead("ComOH", HOST, PID, CNO, "", "" + (endTime - starttime), nodeUUID));
+            t2.start();
+            //   tools.copyFileUsingStream(path, ip2Dir.getAbsolutePath());
+            //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
+            try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
+                value = ois.readObject();
+
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
+
+            } catch (IOException | ClassNotFoundException ex) {
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return value;
+
+    }
+
     public void breakLoop() {
 
-        Socket s = null;
         String workingDir = System.getProperty("user.dir");
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
@@ -212,11 +481,8 @@ public class SIPS implements Serializable {
 
             }
 
-            try {
-                s = new Socket();
-                s.connect(new InetSocketAddress(HOST, taskServerPort));
-                OutputStream os = s.getOutputStream();
-                DataOutputStream outToServer = new DataOutputStream(os);
+            try (Socket s = new Socket(HOST, taskServerPort); OutputStream os = s.getOutputStream();
+                    DataOutputStream outToServer = new DataOutputStream(os);) {
                 JSONObject msg = new JSONObject();
                 msg.put("Command", "breakLoop");
                 JSONObject body = new JSONObject();
@@ -229,20 +495,12 @@ public class SIPS implements Serializable {
                 outToServer.write(bytes);
                 //ObjectInputStream inStream = new ObjectInputStream(s.getInputStream());
                 //value = inStream.readObject();
-                outToServer.close();
-                // inStream.close();
-                s.close();
+
             } catch (IOException ex) {
-                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-                try {
-                    s.close();
-                } catch (IOException ex1) {
-                    Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
-                }
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
-
         }
-
     }
 
     @Deprecated
@@ -286,14 +544,10 @@ public class SIPS implements Serializable {
 
     public Object resolveObject(String objectname, int Instancenumber) {
         Object value = null;
-        //   Socket s = null;
         String workingDir = System.getProperty("user.dir");
         System.out.println("Current working directory : " + workingDir);
-//        if (workingDir.contains("-PID-"))
         {
-
             String lchecksum = "";
-            String path = null;
             String checksum = null;
             File ipDir, ip2Dir = null;
             JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
@@ -304,73 +558,24 @@ public class SIPS implements Serializable {
             String nodeUUID = meta.getString("UUID");
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
-            try (Socket s = new Socket(HOST, fileServerPort)) {
-                OutputStream os = s.getOutputStream();
-                try (DataOutputStream outToServer = new DataOutputStream(os)) {
-                    JSONObject body = new JSONObject();
-                    body.put("PID", PID);
-                    body.put("CNO", CNO);
-                    body.put("CLASSNAME", ClassName);
-                    body.put("OBJECT", objectname);
-                    body.put("UUID", nodeUUID);
-                    body.put("INSTANCE", Instancenumber);
-                    body.put("PROJECT", projectName);
-                    JSONObject msg = new JSONObject();
-                    msg.put("Command", "resolveObjectChecksum");
-                    msg.put("Body", body);
-                    String sendmsg = msg.toString(2);
+            String path = homeDir + "/.build/.simulated/" + ClassName + "/";
+            path += "" + objectname + "-instance-" + Instancenumber + ".obj";
+            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
 
-                    byte[] bytes = sendmsg.getBytes("UTF-8");
-                    outToServer.writeInt(bytes.length);
-                    outToServer.write(bytes);
-
-                    path = homeDir + "/.build/.simulated/" + ClassName + "/";
-                    path += "" + objectname + "-instance-" + Instancenumber + ".obj";
-
-                    try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
-                        int length = dIn.readInt();                    // read length of incoming message
-                        byte[] message = new byte[length];
-
-                        if (length > 0) {
-                            dIn.readFully(message, 0, message.length); // read the message
-                        }
-                        String reply = new String(message);
-                        System.out.println("Recieved " + reply + " from " + HOST);
-                        String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
-                        ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
-                        if (!ipDir.exists()) {
-                            ipDir.mkdirs();
-                        }
-//String filename = new File(_item).getName();
-                        ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
-                        if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
-                            lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
-                        }
-
-                        if (reply.equalsIgnoreCase("foundobj")) {
-                            // receive file
-                            length = dIn.readInt();                    // read length of incoming message
-                            message = new byte[length];
-
-                            if (length > 0) {
-                                dIn.readFully(message, 0, message.length); // read the message
-                            }
-                            checksum = new String(message);
-                            System.out.println("CheckSum Recieved " + checksum);
-                        }
-                    }
-                }
-            } catch (IOException ex) {
-                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-            /*New Logic While wala*/
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
             boolean iRequestedFile = false, alreadyInQue = false;
-            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
-                lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+
+            String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
+            ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+            if (!ipDir.exists()) {
+                ipDir.mkdirs();
             }
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
+            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+                lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
+            }
+
             if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
                 util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
                 Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
@@ -444,19 +649,21 @@ public class SIPS implements Serializable {
                                     iRequestedFile = true;
                                 } else {
                                     System.out.println("Couldn't find file");
+
                                 }
                             } catch (InterruptedException ex) {
-                                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                                Logger.getLogger(SIPS.class
+                                        .getName()).log(Level.SEVERE, null, ex);
+
                             }
                         }
                     } catch (IOException ex) {
-                        Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(SIPS.class
+                                .getName()).log(Level.SEVERE, null, ex);
                     }
 
                 }
             }
-
-            /*New Logic While wala*/
             long endTime = System.currentTimeMillis();
             if (iRequestedFile && !alreadyInQue) {
 
@@ -476,71 +683,22 @@ public class SIPS implements Serializable {
             //  tools.saveCheckSum(ip2Dir.getAbsolutePath() + ".sha", checksum);
             try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
                 value = ois.readObject();
+
             } catch (FileNotFoundException ex) {
-                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
+
             } catch (IOException | ClassNotFoundException ex) {
-                Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(SIPS.class
+                        .getName()).log(Level.SEVERE, null, ex);
             }
         }
         return value;
 
     }
 
-    /*public Object resolveObject(String objectname, int Instancenumber) {
-     Object value = null;
-     Socket s = null;
-     String workingDir = System.getProperty("user.dir");
-     //System.out.println("Current working directory : " + workingDir);
-     if (workingDir.contains("-PID-")) {
-     if (OS_Name == 2) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-PID"));
-     PID = workingDir.substring(workingDir.lastIndexOf("-PID-") + 4, workingDir.lastIndexOf("c"));
-     CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
-
-     } else if (OS_Name == 0) {
-     HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-PID"));
-     PID = workingDir.substring(workingDir.lastIndexOf("-PID-") + 4, workingDir.lastIndexOf("c"));
-     CNO = workingDir.substring(workingDir.lastIndexOf("c") + 1);
-
-     }
-
-     try {
-     s = new Socket();
-     s.connect(new InetSocketAddress(HOST, 13131));
-     OutputStream os = s.getOutputStream();
-     DataOutputStream outToServer = new DataOutputStream(os);
-     String sendmsg = "<Command>resolveObject</Command>"
-     + "<Body><PID>" + PID + "</PID>"
-     + "<CNO>" + CNO + "</CNO>"
-     + "<OBJECT>" + objectname + "</OBJECT>"
-     + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
-     byte[] bytes = sendmsg.getBytes("UTF-8");
-     outToServer.writeInt(bytes.length);
-     outToServer.write(bytes);
-     ObjectInputStream inStream = new ObjectInputStream(s.getInputStream());
-     value = inStream.readObject();
-     outToServer.close();
-     inStream.close();
-     s.close();
-     } catch (IOException ex) {
-     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-     try {
-     s.close();
-     } catch (IOException ex1) {
-     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
-     }
-     } catch (ClassNotFoundException ex) {
-     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-     }
-
-     }
-     return value;
-     }*/
     public void saveArrayElement(Object obj, String objectname, String position, int Instancenumber) {
-        Object value = null;
-        // = null;
         String workingDir = System.getProperty("user.dir");
-        // System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
             if (OS_Name == 2) {
                 HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
@@ -550,45 +708,30 @@ public class SIPS implements Serializable {
                 HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
                 PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
                 CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
             }
-            try {
-                try (Socket s = new Socket()) {
-                    s.connect(new InetSocketAddress(HOST, fileServerPort));
-                    OutputStream os = s.getOutputStream();
-                    try (DataOutputStream outToServer = new DataOutputStream(os)) {
-                        JSONObject body = new JSONObject();
-                        body.put("PID", PID);
-                        body.put("CNO", CNO);
-                        body.put("OBJECT", objectname);
-                        body.put("INSTANCE", Instancenumber);
-                        body.put("POSITION", position);
+            try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream();
+                    DataOutputStream outToServer = new DataOutputStream(os);) {
+                JSONObject body = new JSONObject();
+                body.put("PID", PID);
+                body.put("CNO", CNO);
+                body.put("OBJECT", objectname);
+                body.put("INSTANCE", Instancenumber);
+                body.put("POSITION", position);
 
-                        JSONObject msg = new JSONObject();
-                        msg.put("Command", "saveArrayElement");
-                        msg.put("body", body);
-                        String sendmsg = msg.toString(2);
+                JSONObject msg = new JSONObject();
+                msg.put("Command", "saveArrayElement");
+                msg.put("body", body);
+                String sendmsg = msg.toString(2);
 
-//                        String sendmsg = "<Command>saveArrayElement</Command><Body><PID>" + PID + "</PID>"
-//                                + "<CNO>" + CNO + "</CNO>"
-//                                + "<OBJECT>" + objectname + "</OBJECT>"
-//                                + "<POSITION>" + position + "</POSITION>"
-//                                + "<INSTANCE>" + Instancenumber + "</INSTANCE></Body>";
-                        byte[] bytes = sendmsg.getBytes("UTF-8");
-                        outToServer.writeInt(bytes.length);
-                        outToServer.write(bytes);
-                        ObjectOutputStream outStream = new ObjectOutputStream(os);
-                        outStream.writeObject(obj);
-
-                    }
-                }
-
+                byte[] bytes = sendmsg.getBytes("UTF-8");
+                outToServer.writeInt(bytes.length);
+                outToServer.write(bytes);
+                ObjectOutputStream outStream = new ObjectOutputStream(os);
+                outStream.writeObject(obj);
             } catch (IOException ex) {
                 Logger.getLogger(SIPS.class
                         .getName()).log(Level.SEVERE, null, ex);
-
             }
-
         }
     }
 
@@ -647,8 +790,10 @@ public class SIPS implements Serializable {
 
                 try {
                     s.close();
+
                 } catch (IOException ex1) {
-                    Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
+                    Logger.getLogger(SIPS.class
+                            .getName()).log(Level.SEVERE, null, ex1);
                 }
             }
 
@@ -709,8 +854,11 @@ public class SIPS implements Serializable {
 
                 try {
                     s.close();
+
                 } catch (IOException ex1) {
-                    Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex1);
+                    Logger.getLogger(SIPS.class
+                            .getName()).log(Level.SEVERE, null, ex1);
+
                 }
             } catch (ClassNotFoundException ex) {
                 Logger.getLogger(SIPS.class

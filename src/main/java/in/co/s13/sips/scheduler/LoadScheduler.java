@@ -16,11 +16,10 @@
  */
 package in.co.s13.sips.scheduler;
 
-import in.co.s13.sips.lib.ParallelForSENP;
-import in.co.s13.sips.lib.TaskNodePair;
-import in.co.s13.sips.lib.common.datastructure.LiveNode;
+import in.co.s13.sips.lib.common.datastructure.ParallelForSENP;
 import in.co.s13.sips.lib.common.datastructure.Node;
 import in.co.s13.sips.lib.common.datastructure.ParallelForLoop;
+import in.co.s13.sips.lib.common.datastructure.SIPSTask;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,22 +30,21 @@ import org.json.JSONObject;
  * @author nika
  */
 public class LoadScheduler implements Serializable {
-
+    
     private Scheduler scheduler;
-
+    
     public LoadScheduler(Scheduler scheduler) {
         this.scheduler = scheduler;
     }
-
-    public ArrayList<TaskNodePair> schedule() {
-
-        return scheduler.schedule(); //To change body of generated methods, choose Tools | Templates.
+    
+    public ArrayList<SIPSTask> schedule(ConcurrentHashMap<String, Node> nodes, ConcurrentHashMap<String, SIPSTask> tasks, JSONObject schedulerSettings) {
+        return scheduler.schedule(nodes, tasks, schedulerSettings);        
     }
-
+    
     public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings) {
         return scheduler.scheduleParallelFor(nodes, loop, schedulerSettings);
     }
-
+    
     public int getTotalNodes() {
         return scheduler.getTotalNodes();
     }
@@ -54,13 +52,13 @@ public class LoadScheduler implements Serializable {
     public int getSelectedNodes() {
         return scheduler.getSelectedNodes();
     }
-
+    
     public ArrayList<Node> getBackupNodes() {
         return scheduler.getBackupNodes();
     }
-
+    
     public int getTotalChunks() {
         return scheduler.getTotalChunks();
     }
-
+    
 }
