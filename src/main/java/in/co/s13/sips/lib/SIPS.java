@@ -242,7 +242,7 @@ public class SIPS implements Serializable {
 
     }
 
-    private String resolveObjectChecksum(String HOST, int fileServerPort, String objectname, String nodeUUID, String Instancenumber, String projectName, String senderUUID) {
+    private String resolveObjectChecksum(String HOST, int fileServerPort, String objectname, String nodeUUID, String Instancenumber, String projectName, String senderUUID, boolean isResult) {
         String checksum = "", lchecksum;
         String workingDir = System.getProperty("user.dir");
         try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
@@ -255,9 +255,13 @@ public class SIPS implements Serializable {
             body.put("INSTANCE", Instancenumber);
             body.put("PROJECT", projectName);
             JSONObject msg = new JSONObject();
-            msg.put("Command", "resolveResultChecksum");
+            if (isResult) {
+                msg.put("Command", "resolveResultChecksum");
+            } else {
+                msg.put("Command", "resolveObjectChecksum");
+            }
             msg.put("Body", body);
-            String sendmsg = msg.toString(2);
+            String sendmsg = msg.toString();
 
             byte[] bytes = sendmsg.getBytes("UTF-8");
             outToServer.writeInt(bytes.length);
@@ -289,11 +293,11 @@ public class SIPS implements Serializable {
         return checksum;
     }
 
-    public Object receiveResult(String objectname, int Instancenumber) {
-        return receiveResult(objectname, Instancenumber, 1000, 60);
+    public Object receiveResult(String objectname, int instanceNumber) {
+        return receiveResult(objectname, instanceNumber, 1000, 60);
     }
 
-    public Object receiveResult(String objectname, int Instancenumber, long sleep, long maxTries) {
+    public Object receiveResult(String objectname, int instanceNumber, long sleep, long maxTries) {
         Object value = null;
         String workingDir = System.getProperty("user.dir");
         {
@@ -311,9 +315,9 @@ public class SIPS implements Serializable {
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
             path = homeDir + "/.result/" + ClassName + "/";
-            path += "" + objectname + "-instance-" + Instancenumber + ".obj";
+            path += "" + objectname + "-instance-" + instanceNumber + ".obj";
 
-            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
+            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
             int tries = 0;
             while (checksum.trim().length() < 1) {
                 if (tries >= maxTries) {
@@ -327,7 +331,7 @@ public class SIPS implements Serializable {
                 } catch (InterruptedException ex) {
                     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
+                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID, true);
                 tries++;
             }
             String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
@@ -335,7 +339,7 @@ public class SIPS implements Serializable {
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/.result/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/.result/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
@@ -370,7 +374,7 @@ public class SIPS implements Serializable {
                             body.put("CNO", CNO);
                             body.put("CLASSNAME", ClassName);
                             body.put("OBJECT", objectname);
-                            body.put("INSTANCE", Instancenumber);
+                            body.put("INSTANCE", instanceNumber);
                             body.put("IP", HOST);
                             body.put("UUID", senderUUID);
                             body.put("PROJECT", projectName);
@@ -530,6 +534,10 @@ public class SIPS implements Serializable {
 
     }
 
+    public void setTaskDependency(String taskname, String... dependencies) {
+
+    }
+
     public void setDuration(String taskname, long duration) {
 
     }
@@ -542,7 +550,7 @@ public class SIPS implements Serializable {
 
     }
 
-    public Object resolveObject(String objectname, int Instancenumber) {
+    public Object resolveObject(String objectname, int instanceNumber) {
         Object value = null;
         String workingDir = System.getProperty("user.dir");
         System.out.println("Current working directory : " + workingDir);
@@ -559,8 +567,8 @@ public class SIPS implements Serializable {
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
             String path = homeDir + "/.build/.simulated/" + ClassName + "/";
-            path += "" + objectname + "-instance-" + Instancenumber + ".obj";
-            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID);
+            path += "" + objectname + "-instance-" + instanceNumber + ".obj";
+            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, false);
 
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
@@ -571,7 +579,7 @@ public class SIPS implements Serializable {
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + Instancenumber + ".obj");
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
@@ -601,7 +609,7 @@ public class SIPS implements Serializable {
                             body.put("CNO", CNO);
                             body.put("CLASSNAME", ClassName);
                             body.put("OBJECT", objectname);
-                            body.put("INSTANCE", Instancenumber);
+                            body.put("INSTANCE", instanceNumber);
                             body.put("IP", HOST);
                             body.put("UUID", senderUUID);
                             body.put("PROJECT", projectName);

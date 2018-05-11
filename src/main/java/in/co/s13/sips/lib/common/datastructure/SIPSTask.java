@@ -36,6 +36,7 @@ public class SIPSTask {
     private ArrayList<FileCoverage> files = new ArrayList<>();
     private String nodeUUID, duplicateOf;
     private ArrayList<String> duplicates = new ArrayList<>();
+    private ArrayList<String> dependsOn = new ArrayList<>();
     private int id;
 
     public SIPSTask(int id, String name) {
@@ -137,6 +138,20 @@ public class SIPSTask {
         this.id = id;
     }
 
+    public ArrayList<String> getDependsOn() {
+        return dependsOn;
+    }
+
+    public void setDependsOn(ArrayList<String> dependsOn) {
+        this.dependsOn = dependsOn;
+    }
+
+    public void addDependency(String dependsOn) {
+        if (!this.dependsOn.contains(dependsOn)) {
+            this.dependsOn.add(dependsOn);
+        }
+    }
+
     @Override
     public int hashCode() {
         int hash = 7;
@@ -234,6 +249,12 @@ public class SIPSTask {
             @Override
             public int compare(SIPSTask o1, SIPSTask o2) {
                 return Integer.valueOf(o1.getResources().size()).compareTo(o2.getResources().size());
+            }
+        },
+        NO_OF_DEPENDENCIES {
+            @Override
+            public int compare(SIPSTask o1, SIPSTask o2) {
+                return Integer.valueOf(o1.getDependsOn().size()).compareTo(o2.getDependsOn().size());
             }
         };
 
