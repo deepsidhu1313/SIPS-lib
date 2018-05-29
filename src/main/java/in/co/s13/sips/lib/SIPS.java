@@ -222,7 +222,7 @@ public class SIPS implements Serializable {
                     try (FileInputStream fis = new FileInputStream(fileToSend); BufferedInputStream bis = new BufferedInputStream(fis)) {
                         int theByte = 0;
                         int count;
-                        byte[] mybytearray = new byte[16 * 1024];
+                        byte[] mybytearray = new byte[1024];
                         try (BufferedOutputStream bos = new BufferedOutputStream(outputStream)) {
                             while ((count = bis.read(mybytearray)) > -1) {
                                 bos.write(mybytearray, 0, count);
@@ -245,7 +245,7 @@ public class SIPS implements Serializable {
     private String resolveObjectChecksum(String HOST, int fileServerPort, String objectname, String nodeUUID, String Instancenumber, String projectName, String senderUUID, boolean isResult) {
         String checksum = "", lchecksum;
         String workingDir = System.getProperty("user.dir");
-        try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os)) {
+        try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream(); DataOutputStream outToServer = new DataOutputStream(os); DataInputStream dIn = new DataInputStream(s.getInputStream())) {
             JSONObject body = new JSONObject();
             body.put("PID", PID);
             body.put("CNO", CNO);
@@ -267,25 +267,24 @@ public class SIPS implements Serializable {
             outToServer.writeInt(bytes.length);
             outToServer.write(bytes);
 
-            try (DataInputStream dIn = new DataInputStream(s.getInputStream())) {
-                int length = dIn.readInt();                    // read length of incoming message
-                byte[] message = new byte[length];
+            int length = dIn.readInt();                    // read length of incoming message
+            byte[] message = new byte[length];
+            if (length > 0) {
+                dIn.readFully(message, 0, message.length); // read the message
+            }
+            String reply = new String(message);
+            System.out.println("Recieved " + reply + " from " + HOST);
+            if (reply.equalsIgnoreCase("foundobj")) {
+                length = dIn.readInt();                    // read length of incoming message
+                message = new byte[length];
+
                 if (length > 0) {
                     dIn.readFully(message, 0, message.length); // read the message
                 }
-                String reply = new String(message);
-                System.out.println("Recieved " + reply + " from " + HOST);
-                if (reply.equalsIgnoreCase("foundobj")) {
-                    length = dIn.readInt();                    // read length of incoming message
-                    message = new byte[length];
-
-                    if (length > 0) {
-                        dIn.readFully(message, 0, message.length); // read the message
-                    }
-                    checksum = new String(message);
-                    System.out.println("CheckSum Recieved " + checksum);
-                }
+                checksum = new String(message);
+                System.out.println("CheckSum Recieved " + checksum);
             }
+
         } catch (IOException ex) {
             Logger.getLogger(SIPS.class
                     .getName()).log(Level.SEVERE, null, ex);
@@ -294,14 +293,13 @@ public class SIPS implements Serializable {
     }
 
     public Object receiveResult(String objectname, int instanceNumber) {
-        return receiveResult(objectname, instanceNumber, 1000, 60);
+        return receiveResult(objectname, instanceNumber, 500, 600);
     }
 
     public Object receiveResult(String objectname, int instanceNumber, long sleep, long maxTries) {
         Object value = null;
         String workingDir = System.getProperty("user.dir");
         {
-
             String lchecksum = "";
             String path = "";
             String checksum = "";
@@ -321,7 +319,7 @@ public class SIPS implements Serializable {
             int tries = 0;
             while (checksum.trim().length() < 1) {
                 if (tries >= maxTries) {
-                    System.err.println("Ran out of tries !!!!\n\t\t Either Result is not on Master Node or hasn't been uploaded yet!"
+                    System.out.println("Ran out of tries !!!!\n\t\t Either Result is not on Master Node or hasn't been uploaded yet!"
                             + "\n\t\t If you think your data flow is correct, try increasing maxTries parameter or/and sleep parameter"
                             + "\n\t\t Returning null for now");
                     return value;
@@ -331,7 +329,7 @@ public class SIPS implements Serializable {
                 } catch (InterruptedException ex) {
                     Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, projectName, projectName, senderUUID, true);
+                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
                 tries++;
             }
             String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));

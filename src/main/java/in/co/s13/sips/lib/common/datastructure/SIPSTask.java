@@ -44,6 +44,19 @@ public class SIPSTask {
         this.id = id;
     }
 
+    public SIPSTask(SIPSTask otherTask) {
+        this.name = otherTask.name;
+        this.nodeUUID = otherTask.nodeUUID;
+        this.duplicateOf = otherTask.duplicateOf;
+        this.id = otherTask.id;
+        this.length = otherTask.length;
+        this.timeout = otherTask.timeout;
+        this.resources = otherTask.resources;
+        this.files = otherTask.files;
+        this.duplicates = otherTask.duplicates;
+        this.dependsOn = otherTask.dependsOn;
+    }
+
     public String getName() {
         return name;
     }
