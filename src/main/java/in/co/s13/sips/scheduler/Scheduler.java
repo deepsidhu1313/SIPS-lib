@@ -41,5 +41,9 @@ public interface Scheduler {
     public int getTotalChunks();
 
     public int getSelectedNodes();
+    
+    public ArrayList<String> getErrors();
+    
+    public ArrayList<String> getOutputs();
 
 }

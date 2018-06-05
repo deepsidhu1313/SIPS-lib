@@ -74,9 +74,7 @@ public class tools {
 
     public static String LoadCheckSum(String ld) {
         StringBuilder sb = new StringBuilder();
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new FileReader(ld));
+        try (BufferedReader br = new BufferedReader(new FileReader(ld))) {
             String line = br.readLine();
             while (line != null) {
                 sb.append(line);
@@ -87,12 +85,6 @@ public class tools {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            try {
-                br.close();
-            } catch (IOException ex) {
-                Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
         return sb.toString();
     }

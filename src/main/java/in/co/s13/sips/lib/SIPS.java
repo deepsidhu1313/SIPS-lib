@@ -193,7 +193,25 @@ public class SIPS implements Serializable {
                 String senderUUID = meta.getString("SENDER_UUID");
                 String nodeUUID = meta.getString("UUID");
                 String projectName = meta.getString("PROJECT");
+
                 System.out.println("Host : " + HOST + " Port: " + fileServerPort);
+                String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
+                final String finalPath = path;
+                new Thread(() -> {
+                    File ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+                    if (!ipDir.exists()) {
+                        ipDir.mkdirs();
+                    }
+                    File ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/.result/" + ClassName + "/" + objectName + "-instance-" + instance + ".obj");
+                    if (!ip2Dir.getParentFile().exists()) {
+                        ip2Dir.getParentFile().mkdirs();
+                    }
+                    util.tools.copyFileUsingStream(finalPath, ip2Dir.getAbsolutePath());
+                }).start();
+//                if (!new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
+//                    String lchecksum = tools.getCheckSum(ip2Dir.getAbsolutePath());
+//                }
+
                 try (Socket socket = new Socket(HOST, fileServerPort);
                         OutputStream outputStream = socket.getOutputStream();
                         DataOutputStream outToServer = new DataOutputStream(outputStream);
@@ -209,7 +227,7 @@ public class SIPS implements Serializable {
                     JSONObject msg = new JSONObject();
                     msg.put("Command", "UPLOAD_RESULT");
                     msg.put("Body", body);
-                    String sendmsg = msg.toString(2);
+                    String sendmsg = msg.toString();
 
                     byte[] bytes = sendmsg.getBytes("UTF-8");
                     outToServer.writeInt(bytes.length);
@@ -315,45 +333,46 @@ public class SIPS implements Serializable {
             path = homeDir + "/.result/" + ClassName + "/";
             path += "" + objectname + "-instance-" + instanceNumber + ".obj";
 
-            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
-            int tries = 0;
-            while (checksum.trim().length() < 1) {
-                if (tries >= maxTries) {
-                    System.out.println("Ran out of tries !!!!\n\t\t Either Result is not on Master Node or hasn't been uploaded yet!"
-                            + "\n\t\t If you think your data flow is correct, try increasing maxTries parameter or/and sleep parameter"
-                            + "\n\t\t Returning null for now");
-                    return value;
-                }
-                try {
-                    Thread.sleep(sleep);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
-                tries++;
-            }
             String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
             ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/.result/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/.result/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
             boolean Ndownloaded = true;
-            long starttime = System.currentTimeMillis();
-            boolean iRequestedFile = false, alreadyInQue = false;
-            if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
-                lchecksum = util.tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
-            }
-            if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+
+            if (lchecksum.trim().length() > 0) {
                 util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
                 Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
                 sendCacheHitThread.start();
                 Ndownloaded = false;
             }
+            if (Ndownloaded) {
+                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
+                int tries = 0;
+                while (checksum.trim().length() < 1) {
+                    if (tries >= maxTries) {
+                        System.out.println("Ran out of tries !!!!\n\t\t Either Result is not on Master Node or hasn't been uploaded yet!"
+                                + "\n\t\t If you think your data flow is correct, try increasing maxTries parameter or/and sleep parameter"
+                                + "\n\t\t Returning null for now");
+                        return value;
+                    }
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(SIPS.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
+                    tries++;
+                }
+            }
             long totalSleepTime = 0;
+            boolean iRequestedFile = false, alreadyInQue = false;
+            long starttime = System.currentTimeMillis();
+
             while (Ndownloaded) {
                 String nmsg = "";
                 if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
@@ -566,7 +585,6 @@ public class SIPS implements Serializable {
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
             String path = homeDir + "/.build/.simulated/" + ClassName + "/";
             path += "" + objectname + "-instance-" + instanceNumber + ".obj";
-            checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, false);
 
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
@@ -577,16 +595,19 @@ public class SIPS implements Serializable {
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
+            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
 
-            if (lchecksum.trim().equalsIgnoreCase(checksum.trim())) {
+            if (lchecksum.trim().length() > 0) {
                 util.tools.copyFileUsingStream(ip2Dir.getAbsolutePath(), path);
                 Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
                 sendCacheHitThread.start();
                 Ndownloaded = false;
+            }
+            if (Ndownloaded) {
+                checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, false);
             }
             long totalSleepTime = 0;
             while (Ndownloaded) {
@@ -672,7 +693,6 @@ public class SIPS implements Serializable {
             }
             long endTime = System.currentTimeMillis();
             if (iRequestedFile && !alreadyInQue) {
-
                 long totalTime = endTime - starttime;
                 Thread sendCacheMissThread = new Thread(new sendCacheMiss("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), ip2Dir.length() / (double) ((double) (totalTime) / 1000), (endTime - starttime), totalSleepTime));
                 sendCacheMissThread.start();
@@ -795,7 +815,9 @@ public class SIPS implements Serializable {
                         .getName()).log(Level.SEVERE, null, ex);
 
                 try {
-                    s.close();
+                    if (s != null && !s.isClosed()) {
+                        s.close();
+                    }
 
                 } catch (IOException ex1) {
                     Logger.getLogger(SIPS.class

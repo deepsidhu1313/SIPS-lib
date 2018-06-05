@@ -30,35 +30,43 @@ import org.json.JSONObject;
  * @author nika
  */
 public class LoadScheduler implements Serializable {
-    
+
     private Scheduler scheduler;
-    
+
     public LoadScheduler(Scheduler scheduler) {
         this.scheduler = scheduler;
     }
-    
+
     public ArrayList<SIPSTask> schedule(ConcurrentHashMap<String, Node> nodes, ConcurrentHashMap<String, SIPSTask> tasks, JSONObject schedulerSettings) {
-        return scheduler.schedule(nodes, tasks, schedulerSettings);        
+        return scheduler.schedule(nodes, tasks, schedulerSettings);
     }
-    
+
     public ArrayList<ParallelForSENP> scheduleParallelFor(ConcurrentHashMap<String, Node> nodes, ParallelForLoop loop, JSONObject schedulerSettings) {
         return scheduler.scheduleParallelFor(nodes, loop, schedulerSettings);
     }
-    
+
     public int getTotalNodes() {
         return scheduler.getTotalNodes();
     }
-    
+
     public int getSelectedNodes() {
         return scheduler.getSelectedNodes();
     }
-    
+
     public ArrayList<Node> getBackupNodes() {
         return scheduler.getBackupNodes();
     }
-    
+
     public int getTotalChunks() {
         return scheduler.getTotalChunks();
     }
-    
+
+    public ArrayList<String> getErrors() {
+        return scheduler.getErrors();
+    }
+
+    public ArrayList<String> getOutputs() {
+        return scheduler.getErrors();
+
+    }
 }

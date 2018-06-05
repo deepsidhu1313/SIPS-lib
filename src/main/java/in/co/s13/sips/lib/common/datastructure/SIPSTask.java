@@ -37,6 +37,7 @@ public class SIPSTask {
     private String nodeUUID, duplicateOf;
     private ArrayList<String> duplicates = new ArrayList<>();
     private ArrayList<String> dependsOn = new ArrayList<>();
+    private long startTime = 0;
     private int id;
 
     public SIPSTask(int id, String name) {
@@ -55,6 +56,7 @@ public class SIPSTask {
         this.files = otherTask.files;
         this.duplicates = otherTask.duplicates;
         this.dependsOn = otherTask.dependsOn;
+        this.startTime = otherTask.startTime;
     }
 
     public String getName() {
@@ -165,6 +167,16 @@ public class SIPSTask {
         }
     }
 
+    public long getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(long startTime) {
+        this.startTime = startTime;
+    }
+
+    
+    
     @Override
     public int hashCode() {
         int hash = 7;
@@ -204,6 +216,9 @@ public class SIPSTask {
         if (!Objects.equals(this.resources, other.resources)) {
             return false;
         }
+        if (!Objects.equals(this.startTime, other.startTime)) {
+            return false;
+        }
         return true;
     }
 
@@ -223,6 +238,7 @@ public class SIPSTask {
         result.put("length", length.doubleValue());
         result.put("timeout", timeout.longValue());
         result.put("resources", resources);
+        result.put("dependOn", dependsOn);
         result.put("id", id);
         return result;
     }
@@ -262,6 +278,12 @@ public class SIPSTask {
             @Override
             public int compare(SIPSTask o1, SIPSTask o2) {
                 return Integer.valueOf(o1.getResources().size()).compareTo(o2.getResources().size());
+            }
+        },
+        START_TIME {
+            @Override
+            public int compare(SIPSTask o1, SIPSTask o2) {
+                return Long.valueOf(o1.getStartTime()).compareTo(o2.getStartTime());
             }
         },
         NO_OF_DEPENDENCIES {
