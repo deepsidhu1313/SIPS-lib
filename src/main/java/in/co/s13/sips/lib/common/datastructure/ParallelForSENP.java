@@ -47,8 +47,11 @@ public class ParallelForSENP {
         this.nodeUUID = other.nodeUUID;
         this.diff = other.diff;
         this.duplicateOf = other.duplicateOf;
-        this.duplicates = other.duplicates;
-
+//        this.duplicates = other.duplicates;
+        for (int i = 0; i < other.duplicates.size(); i++) {
+            String get = other.duplicates.get(i);
+            this.duplicates.add(get);
+        }
     }
 
     public String getStart() {

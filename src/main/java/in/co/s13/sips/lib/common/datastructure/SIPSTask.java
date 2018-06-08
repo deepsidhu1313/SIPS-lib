@@ -54,8 +54,12 @@ public class SIPSTask {
         this.timeout = otherTask.timeout;
         this.resources = otherTask.resources;
         this.files = otherTask.files;
-        this.duplicates = otherTask.duplicates;
-        this.dependsOn = otherTask.dependsOn;
+//        this.duplicates = otherTask.duplicates;
+        for (int i = 0; i < otherTask.duplicates.size(); i++) {
+            String get = otherTask.duplicates.get(i);
+            this.duplicates.add(get);
+        }
+        this.dependsOn.addAll(otherTask.dependsOn);
         this.startTime = otherTask.startTime;
     }
 
@@ -175,8 +179,6 @@ public class SIPSTask {
         this.startTime = startTime;
     }
 
-    
-    
     @Override
     public int hashCode() {
         int hash = 7;
@@ -239,6 +241,9 @@ public class SIPSTask {
         result.put("timeout", timeout.longValue());
         result.put("resources", resources);
         result.put("dependOn", dependsOn);
+        result.put("startTime", startTime);
+        result.put("hasDuplicates", hasDuplicates());
+        result.put("isDuplicate", isDuplicate());
         result.put("id", id);
         return result;
     }

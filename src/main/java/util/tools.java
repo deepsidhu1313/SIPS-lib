@@ -36,9 +36,9 @@ import org.json.JSONObject;
 
 public class tools {
 
-    public static String getCheckSum(String datafile) {
+     public static String getCheckSum(String datafile) {
         StringBuilder sb = new StringBuilder("");
-        if (datafile.substring(datafile.lastIndexOf(".") + 1).equalsIgnoreCase("sha")) {
+        if (datafile.substring(datafile.lastIndexOf(".")).equalsIgnoreCase("sha")) {
             System.out.println("Didn't computed CheckSum for " + datafile);
             return "";
         }
@@ -61,11 +61,7 @@ public class tools {
             }
 
             System.out.println("Digest(in hex format):: " + sb.toString());
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
+        } catch (NoSuchAlgorithmException | IOException ex) {
             Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
         }
         saveCheckSum(datafile + ".sha", sb.toString());
@@ -73,22 +69,12 @@ public class tools {
     }
 
     public static String LoadCheckSum(String ld) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new FileReader(ld))) {
-            String line = br.readLine();
-            while (line != null) {
-                sb.append(line);
-                sb.append(System.lineSeparator());
-                line = br.readLine();
-            }
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(tools.class.getName()).log(Level.SEVERE, null, ex);
+        File f = new File(ld);
+        if (!f.exists()) {
+            getCheckSum(ld.substring(0, ld.length() - 3));
         }
-        return sb.toString();
+        return readFile(ld).trim();
     }
-
     public static void saveCheckSum(String Filename, String con) {
         File f = new File(Filename);
         if (f.exists()) {

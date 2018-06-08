@@ -66,7 +66,7 @@ public class LoadScheduler implements Serializable {
     }
 
     public ArrayList<String> getOutputs() {
-        return scheduler.getErrors();
+        return scheduler.getOutputs();
 
     }
 }

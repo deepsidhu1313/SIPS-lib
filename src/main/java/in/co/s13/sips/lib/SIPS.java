@@ -206,7 +206,15 @@ public class SIPS implements Serializable {
                     if (!ip2Dir.getParentFile().exists()) {
                         ip2Dir.getParentFile().mkdirs();
                     }
-                    util.tools.copyFileUsingStream(finalPath, ip2Dir.getAbsolutePath());
+                    File tmpFile = new File(ip2Dir.getAbsolutePath() + ".tmp");
+
+                    int r = 0;
+                    while (tmpFile.exists()) {
+                        tmpFile = new File(ip2Dir.getAbsolutePath() + ".tmp." + r);
+                        r++;
+                    }
+                    util.tools.copyFileUsingStream(finalPath, tmpFile.getAbsolutePath());
+                    new File(ip2Dir.getAbsolutePath() + ".tmp").renameTo(ip2Dir);
                 }).start();
 //                if (!new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
 //                    String lchecksum = tools.getCheckSum(ip2Dir.getAbsolutePath());
@@ -349,6 +357,18 @@ public class SIPS implements Serializable {
                 Thread sendCacheHitThread = new Thread(new sendCacheHit("127.0.0.1", PID, CNO, nodeUUID, senderUUID, ip2Dir.length(), 0, 0, 0));
                 sendCacheHitThread.start();
                 Ndownloaded = false;
+                try (FileInputStream fis = new FileInputStream(path); GZIPInputStream gs = new GZIPInputStream(fis); ObjectInputStream ois = new ObjectInputStream(gs)) {
+                    value = ois.readObject();
+
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(SIPS.class
+                            .getName()).log(Level.SEVERE, null, ex);
+
+                } catch (IOException | ClassNotFoundException ex) {
+                    Logger.getLogger(SIPS.class
+                            .getName()).log(Level.SEVERE, null, ex);
+                }
+                return value;
             }
             if (Ndownloaded) {
                 checksum = resolveObjectChecksum(HOST, fileServerPort, objectname, nodeUUID, "" + instanceNumber, projectName, senderUUID, true);
