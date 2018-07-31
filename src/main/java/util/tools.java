@@ -200,7 +200,8 @@ public class tools {
 
     public static void write(String path, String text) {
         File file = new File(path);
-        file.getParentFile().mkdirs();
+        
+        new File(file.getAbsolutePath()).getParentFile().mkdirs();
         try (FileWriter fw = new FileWriter(new File(path));
                 PrintWriter pw = new PrintWriter(fw)) {
             pw.print(text);

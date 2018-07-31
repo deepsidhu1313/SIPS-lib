@@ -37,7 +37,7 @@ public class SIPSTask {
     private String nodeUUID, duplicateOf;
     private ArrayList<String> duplicates = new ArrayList<>();
     private ArrayList<String> dependsOn = new ArrayList<>();
-    private long startTime = 0;
+    private Double startTime = 0.0;
     private int id;
 
     public SIPSTask(int id, String name) {
@@ -171,11 +171,11 @@ public class SIPSTask {
         }
     }
 
-    public long getStartTime() {
+    public Double getStartTime() {
         return startTime;
     }
 
-    public void setStartTime(long startTime) {
+    public void setStartTime(Double startTime) {
         this.startTime = startTime;
     }
 
@@ -235,8 +235,9 @@ public class SIPSTask {
 
     public JSONObject toJSON() {
         JSONObject result = new JSONObject();
+        result.put("id", id);
+        result.put("nodeUUID", nodeUUID);
         result.put("name", name);
-        result.put("files", files);
         result.put("length", length.doubleValue());
         result.put("timeout", timeout.longValue());
         result.put("resources", resources);
@@ -244,7 +245,7 @@ public class SIPSTask {
         result.put("startTime", startTime);
         result.put("hasDuplicates", hasDuplicates());
         result.put("isDuplicate", isDuplicate());
-        result.put("id", id);
+        result.put("files", files);
         return result;
     }
 
@@ -288,7 +289,7 @@ public class SIPSTask {
         START_TIME {
             @Override
             public int compare(SIPSTask o1, SIPSTask o2) {
-                return Long.valueOf(o1.getStartTime()).compareTo(o2.getStartTime());
+                return Double.valueOf(o1.getStartTime()).compareTo(o2.getStartTime());
             }
         },
         NO_OF_DEPENDENCIES {
