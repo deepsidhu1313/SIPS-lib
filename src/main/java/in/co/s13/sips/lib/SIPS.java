@@ -84,7 +84,26 @@ public class SIPS implements Serializable {
         }
     }
 
+    /**
+     * Whether this program is running under SIPS-Run, which creates the parsed
+     * and simulated databases during its parsing pass.
+     */
+    private boolean hasSimulationDatabase() {
+        return new File(simDBLoc).isFile();
+    }
+
+    /**
+     * Captures runtime values during the simulation pass, so SIPS can resolve
+     * loop bounds that are variables rather than literals.
+     *
+     * <p>Does nothing when the simulation database is absent. That is the
+     * normal case when the program is run standalone rather than submitted
+     * through SIPS-Run, and a SIPS program must stay runnable on its own.
+     */
     public void saveValues(String... str) {
+        if (!hasSimulationDatabase()) {
+            return;
+        }
         String sql = "";
         for (int i = 0; i <= str.length - 1; i++) {
             System.out.println("" + str[i]);
