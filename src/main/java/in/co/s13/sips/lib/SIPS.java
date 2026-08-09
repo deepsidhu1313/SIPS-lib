@@ -17,6 +17,7 @@
 package in.co.s13.sips.lib;
 
 import in.co.s13.SIPS.db.SQLiteJDBC;
+import in.co.s13.sips.lib.common.SipsPaths;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -59,11 +60,13 @@ public class SIPS implements Serializable {
     public SIPS(String className) {
         this.ClassName = className;
         //int pid = Integer.parseInt(workingDir.substring(workingDir.lastIndexOf("/")));
-        if (ClassName.contains(".")) {
-            ClassName = ClassName.replaceAll("\\.", "/");
-        }
-        simDBLoc = homeDir + "/.simulated/" + ClassName + "-sim.db";
-        parsedCodeDBLoc = homeDir + "/.parsed/" + ClassName + "-parsed.db";
+        // Built with the platform separator. These were concatenated with "/",
+        // which on Windows yields C:\\Users\\x/.simulated/Foo-sim.db — tolerated
+        // by the file APIs, but wrong anywhere the path is compared or stored.
+        // SIPS-lib#1.
+        ClassName = SipsPaths.classNameToPath(ClassName);
+        simDBLoc = SipsPaths.join(homeDir, ".simulated", ClassName + "-sim.db");
+        parsedCodeDBLoc = SipsPaths.join(homeDir, ".parsed", ClassName + "-parsed.db");
         System.out.println("SIM DB Location: " + simDBLoc);
         System.out.println("PARSED DB Location: " + parsedCodeDBLoc);
         if (isWindows()) {
