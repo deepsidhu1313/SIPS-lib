@@ -1,0 +1,9 @@
+# Compute backends discovered by AcceleratorRegistry.
+# Order is irrelevant; the registry ranks devices, not backends.
+in.co.s13.sips.lib.accelerator.JavaCpuBackend
+in.co.s13.sips.lib.accelerator.OpenCLBackend
+in.co.s13.sips.lib.accelerator.CudaBackend
+in.co.s13.sips.lib.accelerator.RocmBackend
+in.co.s13.sips.lib.accelerator.MetalBackend
+in.co.s13.sips.lib.accelerator.VulkanBackend
+in.co.s13.sips.lib.accelerator.NpuBackend
