@@ -576,7 +576,7 @@ public class SIPS implements Serializable {
                 JSONObject body = new JSONObject();
                 body.put("PID", PID);
                 body.put("CNO", CNO);
-                msg.put("body", body);
+                msg.put("Body", body);
                 String sendmsg = msg.toString(2);
                 byte[] bytes = sendmsg.getBytes("UTF-8");
                 outToServer.writeInt(bytes.length);
@@ -823,7 +823,7 @@ public class SIPS implements Serializable {
 
                 JSONObject msg = new JSONObject();
                 msg.put("Command", "saveArrayElement");
-                msg.put("body", body);
+                msg.put("Body", body);
                 String sendmsg = msg.toString(2);
 
                 byte[] bytes = sendmsg.getBytes("UTF-8");
@@ -879,7 +879,7 @@ public class SIPS implements Serializable {
 
                     JSONObject msg = new JSONObject();
                     msg.put("Command", "updateArrayElement");
-                    msg.put("body", body);
+                    msg.put("Body", body);
                     String sendmsg = msg.toString(2);
 
 //                    String sendmsg = "<Command>updateArrayElement</Command>"
@@ -955,7 +955,7 @@ public class SIPS implements Serializable {
 
                 JSONObject msg = new JSONObject();
                 msg.put("Command", "resolveArrayElement");
-                msg.put("body", body);
+                msg.put("Body", body);
                 String sendmsg = msg.toString(2);
 
 //                String sendmsg = "<Command>resolveArrayElement</Command>"
@@ -1035,4 +1035,89 @@ public class SIPS implements Serializable {
         this.fileServerPort = fileServerPort;
     }
 
+
+    /**
+     * Stops the whole loop across every node, carrying a value back.
+     *
+     * <p>For search: "I found it, nobody needs to keep looking." Brute-force
+     * key recovery, preimage search, SAT solving.
+     *
+     * <pre>{@code
+     * for (long c = 0; c < keyspace; c++) {
+     *     if (matches(c)) {
+     *         sim.breakAll(c, describe(c));
+     *     }
+     * }
+     * }</pre>
+     *
+     * <p><b>Find-any, not find-first.</b> If two nodes match at the same moment
+     * the one that reports first wins, which may not be the lower index. Where
+     * the lowest match is required, collect every match and take the minimum.
+     *
+     * <p>Iterations already running are not interrupted, and iterations beyond
+     * this one may already have completed elsewhere.
+     *
+     * @param index the iteration that found it
+     * @param value the answer to carry home; must be serialisable, may be null
+     */
+    public void breakAll(long index, java.io.Serializable value) {
+        signalEarlyExit("breakAll", index, value, "breakAll at " + index);
+    }
+
+    /**
+     * Stops iterations beyond {@code lastWantedIndex}.
+     *
+     * <p>For a prefix computation: a series that converged, a simulation that
+     * reached steady state. The boundary index itself is wanted, so "after 100"
+     * means 101 onward.
+     *
+     * <p>Unlike {@link #breakAll} this does <b>not</b> cancel everything.
+     * Chunks before the boundary are still required — their results are part of
+     * the answer — and a chunk straddling it must run because it contains
+     * wanted iterations.
+     */
+    public void breakAfter(long lastWantedIndex, String why) {
+        signalEarlyExit("breakAfter", lastWantedIndex, null, why);
+    }
+
+    /** Tells the master to stop handing out work for this job. */
+    private void signalEarlyExit(String command, long index,
+            java.io.Serializable value, String why) {
+        String workingDir = System.getProperty("user.dir");
+        if (!workingDir.contains("-ID-")) {
+            // Running standalone rather than as a distributed chunk: there is
+            // no master to tell, and the surrounding loop is the user's to end.
+            return;
+        }
+        java.io.File dir = new java.io.File(workingDir);
+        String[] parts = dir.getName().split("-CN-");
+        String chunk = parts.length > 1 ? parts[1] : "0";
+        String job = dir.getName().contains("-ID-")
+                ? dir.getName().substring(dir.getName().indexOf("-ID-") + 4,
+                        dir.getName().lastIndexOf("-CN-"))
+                : "";
+        String host = dir.getName().substring(0, Math.max(0, dir.getName().indexOf("-ID")));
+
+        try (Socket s = new Socket(host, taskServerPort);
+                DataOutputStream out = new DataOutputStream(s.getOutputStream())) {
+            JSONObject msg = new JSONObject();
+            msg.put("Command", command);
+            JSONObject body = new JSONObject();
+            body.put("PID", job);
+            body.put("CNO", chunk);
+            body.put("INDEX", index);
+            body.put("REASON", why == null ? "" : why);
+            if (value != null) {
+                body.put("VALUE", String.valueOf(value));
+            }
+            msg.put("Body", body);
+            byte[] bytes = msg.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            out.writeInt(bytes.length);
+            out.write(bytes);
+            out.flush();
+        } catch (IOException ex) {
+            Logger.getLogger(SIPS.class.getName()).log(Level.WARNING,
+                    "Could not signal " + command + "; the loop will run to completion", ex);
+        }
+    }
 }
