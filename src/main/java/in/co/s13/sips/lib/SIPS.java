@@ -527,6 +527,31 @@ public class SIPS implements Serializable {
 
     }
 
+    /**
+     * Requests that the loop stop early.
+     *
+     * <p><b>Not yet wired end to end.</b> Three pieces are needed and one is
+     * missing at each layer: the AST pass recognises nine markers
+     * ({@code parallelFor}, {@code saveValues}, {@code defineTask} and so on)
+     * but not this one; no node handler exists for the {@code breakLoop}
+     * command; and the body is sent under the key {@code "body"} where every
+     * handler reads {@code "Body"}.
+     *
+     * <p>The design is sound and the transformation route is the right one —
+     * see {@code docs/PARALLEL_LOOPS.md} for how the pass should rewrite a call
+     * into a local {@code break} plus a signal to the master.
+     *
+     * <p>When it lands, its semantics will be
+     * {@link in.co.s13.sips.lib.loop.LoopCancellation}'s: no further chunks are
+     * handed out, but iterations already running finish, and iterations with a
+     * later index may already have completed. That is cancellation, not
+     * sequential {@code break}, and no distributed loop can offer the latter
+     * without giving up the parallelism that justified distributing it.
+     *
+     * <p><b>{@code continue} needs nothing.</b> A plain Java {@code continue}
+     * inside a parallel loop is already correct — skipping an iteration is
+     * node-local and needs no coordination.
+     */
     public void breakLoop() {
 
         String workingDir = System.getProperty("user.dir");
@@ -765,6 +790,16 @@ public class SIPS implements Serializable {
 
     }
 
+    /**
+     * @deprecated Not implemented. The node has no handler for this command,
+     * so calling it sends a message that is silently discarded — and the body
+     * is sent under the key "body" where every handler reads "Body", so it
+     * could not have worked even if a handler existed.
+     *
+     * <p>Left in place rather than deleted so existing code still compiles,
+     * but it does nothing and never did.
+     */
+    @Deprecated(forRemoval = true)
     public void saveArrayElement(Object obj, String objectname, String position, int Instancenumber) {
         String workingDir = System.getProperty("user.dir");
         if (workingDir.contains("-ID-")) {
@@ -803,6 +838,16 @@ public class SIPS implements Serializable {
         }
     }
 
+    /**
+     * @deprecated Not implemented. The node has no handler for this command,
+     * so calling it sends a message that is silently discarded — and the body
+     * is sent under the key "body" where every handler reads "Body", so it
+     * could not have worked even if a handler existed.
+     *
+     * <p>Left in place rather than deleted so existing code still compiles,
+     * but it does nothing and never did.
+     */
+    @Deprecated(forRemoval = true)
     public void updateArrayElement(Object obj, String objectname, String position, int Instancenumber) {
         Object value = null;
         Socket s = null;
@@ -870,6 +915,16 @@ public class SIPS implements Serializable {
         }
     }
 
+    /**
+     * @deprecated Not implemented. The node has no handler for this command,
+     * so calling it sends a message that is silently discarded — and the body
+     * is sent under the key "body" where every handler reads "Body", so it
+     * could not have worked even if a handler existed.
+     *
+     * <p>Left in place rather than deleted so existing code still compiles,
+     * but it does nothing and never did.
+     */
+    @Deprecated(forRemoval = true)
     public Object resolveArrayElement(String objectname, String position, int Instancenumber) {
         Object value = null;
         Socket s = null;
