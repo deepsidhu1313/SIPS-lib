@@ -303,4 +303,33 @@ public final class Kernels {
     static int clamp(int v, int lo, int hi) {
         return v < lo ? lo : (v > hi ? hi : v);
     }
+
+    /**
+     * Rough arithmetic operations per pixel, used to decide whether an
+     * accelerator will pay for the cost of moving the image to it.
+     *
+     * <p>These are counted from the kernel bodies, not measured, and only need
+     * to be right to within a factor of two — they feed a threshold, not a
+     * model.
+     */
+    public static int opsPerPixel(ImageKernel kernel) {
+        if (kernel == INVERT) {
+            return 2;
+        }
+        if (kernel == GRAYSCALE) {
+            return 3;
+        }
+        if (kernel == BLUR3) {
+            return 14;      // nine samples, three channels accumulated
+        }
+        if (kernel == SHARPEN) {
+            return 20;      // five samples, three channels, weighted
+        }
+        if (kernel == SOBEL) {
+            return 30;      // nine samples, luma each, two weighted sums
+        }
+        // A custom kernel of unknown cost: assume it is worth accelerating,
+        // since someone who wrote a kernel usually has arithmetic to do.
+        return WorkloadProfile.COMPUTE_BOUND_THRESHOLD;
+    }
 }
