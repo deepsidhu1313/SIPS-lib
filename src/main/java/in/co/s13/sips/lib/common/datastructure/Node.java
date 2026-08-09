@@ -90,6 +90,21 @@ public interface Node {
 
     public int hashCode();
 
+    /**
+     * Compute devices this node offers, so a scheduler can place work on
+     * hardware that suits it.
+     *
+     * <p>Defaulted to empty: peers running older builds advertise none, and
+     * both implementations of this interface predate device discovery.
+     */
+    default java.util.List<in.co.s13.sips.lib.accelerator.Device> getDevices() {
+        return java.util.List.of();
+    }
+
+    default void setDevices(java.util.List<in.co.s13.sips.lib.accelerator.Device> devices) {
+        // no-op for implementations that do not track devices
+    }
+
     public JSONObject toJSON();
 
     public boolean equals(Object obj);

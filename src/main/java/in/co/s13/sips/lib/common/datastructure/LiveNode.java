@@ -27,6 +27,9 @@ import org.json.JSONObject;
 
 public class LiveNode implements Node {
 
+    /** Compute devices this node advertises; empty for peers that advertise none. */
+    private java.util.List<in.co.s13.sips.lib.accelerator.Device> devices = java.util.List.of();
+
     private int task_limit, waiting_in_que;
     private String uuid, operatingSytem, hostname = "", processor_name;
 
@@ -474,5 +477,15 @@ public class LiveNode implements Node {
                 return 0;
             };
         }
+    }
+
+    @Override
+    public java.util.List<in.co.s13.sips.lib.accelerator.Device> getDevices() {
+        return devices;
+    }
+
+    @Override
+    public void setDevices(java.util.List<in.co.s13.sips.lib.accelerator.Device> devices) {
+        this.devices = devices == null ? java.util.List.of() : java.util.List.copyOf(devices);
     }
 }

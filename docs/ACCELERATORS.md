@@ -128,17 +128,16 @@ Being explicit, because these gap the path from "devices are visible" to
 
 1. **No kernel execution.** The registry discovers and ranks devices; it does not
    yet compile or run OpenCL kernels. That is the next piece of work.
-2. **The task transport is still text-only.** `Distributor.upload()` puts file
-   contents into a JSON string field, so binary image data cannot pass through
-   the task path intact. Image payloads must be routed through the file server's
-   streaming path, which is binary-safe and already checksums with SHA.
-3. **Schedulers are not device-aware.** The `Scheduler` interface takes nodes and
-   tasks; it has no notion of the devices a node offers. Extending
-   `Node` to carry its `List<Device>` is the prerequisite for placing tiles on
-   suitable hardware.
+2. ~~**The task transport is still text-only.**~~ Fixed: `FilePayload` carries
+   content byte-exactly, using UTF-8 for text and Base64 for anything that is
+   not valid UTF-8, so binary image data now survives the task path.
+3. **Schedulers do not yet read device information.** Nodes now advertise their
+   devices in the ping response and `Node.getDevices()` carries them, so the
+   information reaches the scheduler. What remains is for a scheduler to rank on
+   it — the `Scheduler` interface signature already receives the nodes.
 4. **No result-merge primitive.** `TileGrid` guarantees tiles reassemble, and
    `Tile.index()` says where each belongs, but nothing yet performs the
    reassembly.
 
-Items 2 and 3 are prerequisites for real distributed image processing. Item 1 is
-what makes the accelerators useful once the data can reach them.
+Item 1 is what makes the accelerators useful now that data can reach them, and
+item 4 is what makes tiled results usable once they come back.
