@@ -17,6 +17,7 @@
 package in.co.s13.sips.lib.wasm;
 
 import java.io.ByteArrayOutputStream;
+import in.co.s13.sips.lib.ml.WarmModels;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -130,6 +131,47 @@ class WasmRunnerTest {
             }
             assertEquals(1, runner.cachedModuleCount());
         }
+    }
+
+    @Test
+    @Timeout(30)
+    void theSameModuleIsParsedOnceAcrossChunksAndRunners(@TempDir Path dir) throws IOException {
+        // What a node actually does, which the per-path test above does not
+        // reach: every chunk gets its own sandbox, so the same module arrives
+        // at proc/<node>/<job>/0/m.wasm, then .../1/m.wasm, and a new runner
+        // is built for each. Keyed by path, on a per-runner map, that is a
+        // parse per chunk -- the cost this task type exists to avoid, paid
+        // every time anyway.
+        WarmModels.standDown();
+        byte[] moduleBytes = Files.readAllBytes(successModule(dir));
+
+        for (int chunk = 0; chunk < 5; chunk++) {
+            Path sandbox = Files.createDirectories(dir.resolve("chunk-" + chunk));
+            Path module = Files.write(sandbox.resolve("module.wasm"), moduleBytes);
+            try (WasmRunner runner = new WasmRunner()) {
+                runner.run(new WasmTask("job-1", chunk, module, null, 0, 10),
+                        Duration.ofSeconds(10));
+            }
+        }
+
+        assertEquals(1, WarmModels.held(),
+                "the same bytes at five paths should be one parsed module");
+    }
+
+    @Test
+    @Timeout(30)
+    void twoDifferentModulesAreParsedSeparately(@TempDir Path dir) throws IOException {
+        WarmModels.standDown();
+
+        try (WasmRunner runner = new WasmRunner()) {
+            runner.run(new WasmTask("job-1", 0, successModule(dir), null, 0, 10),
+                    Duration.ofSeconds(10));
+            Path other = Files.createDirectories(dir.resolve("other"));
+            runner.run(new WasmTask("job-1", 1, countingModule(other), null, 0, 10),
+                    Duration.ofSeconds(10));
+        }
+
+        assertEquals(2, WarmModels.held());
     }
 
     @Test

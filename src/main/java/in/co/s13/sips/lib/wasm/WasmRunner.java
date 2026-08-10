@@ -21,6 +21,8 @@ import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
+import in.co.s13.sips.lib.ml.WarmModels;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,9 +40,16 @@ import java.util.concurrent.TimeoutException;
  * requirement that makes the Ant path painful, whereas Chicory arrives as an
  * ordinary dependency and works wherever the JVM does.
  *
- * <p>Parsed modules are cached by path. Parsing is the only meaningful cost —
- * once a module is loaded, instantiating and invoking it is microseconds — so a
- * job whose chunks share a module pays that once rather than per chunk.
+ * <p>Parsed modules are kept by content address in {@link WarmModels}, which
+ * outlives the runner. Parsing is the only meaningful cost — once a module is
+ * loaded, instantiating and invoking it is microseconds — so a job whose chunks
+ * share a module pays it once.
+ *
+ * <p>By content and not by path, because a node gives every chunk its own
+ * sandbox: the same module arrives as {@code proc/<node>/<job>/0/m.wasm}, then
+ * {@code .../1/m.wasm}, and a fresh runner is built for each. Keyed by path on
+ * a per-runner map, that was a parse per chunk — the cost this task type exists
+ * to avoid, paid every time regardless.
  *
  * <p>What is <em>not</em> cached is the instance. Host functions are bound to
  * one instance when it is built, so reusing an instance across chunks would let
@@ -49,6 +58,7 @@ import java.util.concurrent.TimeoutException;
  */
 public final class WasmRunner implements AutoCloseable {
 
+    /** Modules parsed by this runner, for {@link #cachedModuleCount()}. */
     private final ConcurrentHashMap<String, WasmModule> modules = new ConcurrentHashMap<>();
     private final ExecutorService watchdog = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "wasm-watchdog");
@@ -130,19 +140,37 @@ public final class WasmRunner implements AutoCloseable {
     }
 
     private WasmModule load(WasmTask task) {
-        String key = task.module().toAbsolutePath().toString();
-        return modules.computeIfAbsent(key, path -> {
+        if (!Files.isReadable(task.module())) {
+            throw new WasmExecutionException("Module not readable: " + task.module());
+        }
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(task.module());
+        } catch (IOException ex) {
+            throw new WasmExecutionException("Could not read module " + task.module(), ex);
+        }
+        // Hashing costs a pass over a file of kilobytes; parsing costs orders
+        // of magnitude more, and the alternative is parsing once per chunk.
+        String address = address(bytes);
+        WasmModule module = WarmModels.get(address, () -> {
             try {
-                if (!Files.isReadable(task.module())) {
-                    throw new WasmExecutionException("Module not readable: " + task.module());
-                }
-                return Parser.parse(task.module().toFile());
-            } catch (WasmExecutionException ex) {
-                throw ex;
+                return Parser.parse(new java.io.ByteArrayInputStream(bytes));
             } catch (RuntimeException ex) {
                 throw new WasmExecutionException("Could not load module " + task.module(), ex);
             }
         });
+        modules.put(address, module);
+        return module;
+    }
+
+    /** The content address a parsed module is kept under. */
+    private static String address(byte[] bytes) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is required of every JVM", impossible);
+        }
     }
 
     /** How many distinct modules are cached. */
