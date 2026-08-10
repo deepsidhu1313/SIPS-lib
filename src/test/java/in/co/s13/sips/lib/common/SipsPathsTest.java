@@ -114,4 +114,69 @@ class SipsPathsTest {
         String joined = SipsPaths.join("a", "b", "c.txt");
         assertEquals(joined, new File(joined).getPath());
     }
+
+    // ---- the root of the first segment ----
+
+    @Test
+    void anAbsoluteBaseStaysAbsolute() {
+        // The bug this exists to prevent. Splitting the base on separators
+        // dropped its leading slash, so "/home/nika/.sips" became
+        // "home/nika/.sips" -- silently relative to whatever directory the
+        // process happened to be started in, and therefore a different file.
+        String home = Path.of(System.getProperty("user.home")).toString();
+
+        String joined = SipsPaths.join(home, ".simulated", "Search-sim.db");
+
+        assertTrue(Path.of(joined).isAbsolute(),
+                joined + " should still be absolute");
+        assertTrue(joined.startsWith(home), joined + " should start with " + home);
+    }
+
+    @Test
+    void aRelativeBaseStaysRelative() {
+        assertFalse(Path.of(SipsPaths.join("proc", "job", "0")).isAbsolute());
+    }
+
+    @Test
+    void onlyTheFirstSegmentCanSetTheRoot() {
+        // The distributor sends names like "/src/Main.java" meaning "inside the
+        // chunk directory". Treating that as a new root would write to the
+        // filesystem root -- outside the sandbox entirely.
+        String joined = SipsPaths.join("proc/uuid/job/0", "/src/Main.java");
+
+        assertFalse(Path.of(joined).isAbsolute(), joined + " must stay inside the chunk");
+        assertTrue(joined.endsWith(Path.of("src", "Main.java").toString()));
+        assertTrue(joined.startsWith("proc"));
+    }
+
+    @Test
+    void anAbsoluteBaseSurvivesALaterRootedSegment() {
+        String home = Path.of(System.getProperty("user.home")).toString();
+
+        String joined = SipsPaths.join(home, "/data/job");
+
+        assertTrue(Path.of(joined).isAbsolute());
+        assertTrue(joined.startsWith(home));
+    }
+
+    @Test
+    void theResultUsesOnlyThisPlatformsSeparator() {
+        // What "mixed separator" actually means, and the assertion that catches
+        // it on the Windows CI leg rather than in somebody's log a year later.
+        String joined = SipsPaths.join("proc", "uuid/job", "0");
+        char foreign = File.separatorChar == '/' ? '\\' : '/';
+
+        assertEquals(-1, joined.indexOf(foreign),
+                joined + " mixes separators");
+    }
+
+    @Test
+    void aWindowsStyleBaseKeepsItsDriveOnWindows() {
+        // Only meaningful on Windows; elsewhere "C:" is an ordinary directory
+        // name and the assertion below still holds.
+        String joined = SipsPaths.join("C:/sips", "data", "job");
+
+        assertTrue(joined.startsWith("C:"), joined);
+        assertTrue(joined.endsWith(Path.of("data", "job").toString()), joined);
+    }
 }

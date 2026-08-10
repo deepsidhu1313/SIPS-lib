@@ -43,32 +43,50 @@ public final class SipsPaths {
     /**
      * Joins segments with the platform separator.
      *
-     * <p>Segments may themselves contain either separator; both are understood,
-     * so paths written on one platform can be read on another. Empty and null
-     * segments are skipped rather than producing a doubled separator.
+     * <p>The <em>first</em> segment sets the root: an absolute path stays
+     * absolute, a Windows drive letter is kept, and a relative base stays
+     * relative. Every <em>later</em> segment is treated as relative even if it
+     * begins with a separator — the distributor sends names like
+     * {@code /src/Main.java} meaning "inside the chunk directory", and treating
+     * that as a new root would write to the filesystem root instead.
+     *
+     * <p>Later segments may use either separator, so a path recorded on one
+     * platform can be read on another. Empty and null segments are skipped
+     * rather than producing a doubled separator.
      *
      * @throws IllegalArgumentException if no usable segment is given
      */
     public static String join(String... segments) {
-        List<String> parts = new ArrayList<>();
+        Path joined = null;
         if (segments != null) {
             for (String segment : segments) {
                 if (segment == null || segment.isBlank()) {
                     continue;
                 }
+                if (joined == null) {
+                    // Handed to Path.of whole, so its root survives. Splitting
+                    // it first would turn "/home/nika" into "home/nika" and
+                    // quietly reinterpret an absolute path as relative to
+                    // whatever directory the process happens to be in.
+                    //
+                    // Backslashes become forward slashes first: Windows Path
+                    // accepts either, and it lets a path recorded on Windows be
+                    // read here. A genuine backslash in a Unix filename is the
+                    // price, and it is not one anybody pays in practice.
+                    joined = Path.of(segment.replace('\\', '/'));
+                    continue;
+                }
                 for (String piece : segment.split("[/\\\\]+")) {
                     if (!piece.isBlank()) {
-                        parts.add(piece);
+                        joined = joined.resolve(piece);
                     }
                 }
             }
         }
-        if (parts.isEmpty()) {
+        if (joined == null) {
             throw new IllegalArgumentException("At least one path segment is required");
         }
-        String first = parts.get(0);
-        String[] rest = parts.subList(1, parts.size()).toArray(new String[0]);
-        return Path.of(first, rest).normalize().toString();
+        return joined.normalize().toString();
     }
 
     /** The same, as a {@link Path}. */
