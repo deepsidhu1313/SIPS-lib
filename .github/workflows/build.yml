@@ -21,6 +21,20 @@ jobs:
           java-version: '21'
           distribution: temurin
           cache: maven
+      - name: Install siblings not published to Maven Central
+        # Built and installed here, in dependency order, because a standalone
+        # build cannot resolve them from central. Tags are pinned so a run is
+        # reproducible rather than depending on what a branch holds today.
+        run: |
+          for pair in "common-json:v1.1.0" "common-sqlitejdbc:v1.1.0"; do
+            repo="${pair%%:*}"
+            tag="${pair##*:}"
+            git clone --depth 1 --branch "$tag" \
+              "https://github.com/deepsidhu1313/$repo.git" "$RUNNER_TEMP/$repo"
+            (cd "$RUNNER_TEMP/$repo" && mvn -B -q install \
+              -DskipTests -Dgpg.skip -Dmaven.javadoc.skip=true -Dmaven.source.skip=true)
+          done
+        shell: bash
       - name: Build and test
         run: ./mvnw -B verify -Dgpg.skip
         shell: bash
