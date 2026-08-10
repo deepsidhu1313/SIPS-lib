@@ -18,6 +18,7 @@ package in.co.s13.sips.lib.accelerator;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -132,6 +133,28 @@ class PowerTest {
         for (PowerMonitor monitor : PowerMonitors.all()) {
             monitor.readWatts().ifPresent(watts -> assertTrue(watts >= 0 && watts < 10_000,
                     monitor.name() + " reported an implausible " + watts + " W"));
+        }
+    }
+
+    @Test
+    void aMonitorForAnotherPlatformStillLoadsAndExplainsItself() {
+        // The RAPL counter lives at ".../intel-rapl:0/energy_uj". Windows
+        // rejects the colon with an InvalidPathException, and holding that path
+        // in a static field turned it into a NoClassDefFoundError -- so on
+        // Windows every caller crashed, including ones that only wanted to be
+        // told RAPL was unavailable. Loading the class must not depend on the
+        // platform being able to express the path.
+        PowerMonitors.LinuxRaplMonitor rapl = new PowerMonitors.LinuxRaplMonitor();
+
+        assertDoesNotThrow(rapl::isAvailable);
+        assertDoesNotThrow(rapl::unavailableReason);
+        assertDoesNotThrow(rapl::readWatts);
+        assertEquals("Linux RAPL", rapl.name());
+
+        if (!System.getProperty("os.name", "").toLowerCase().contains("linux")) {
+            assertFalse(rapl.unavailableReason().isEmpty(),
+                    "off Linux it must say why, not merely fail");
+            assertTrue(rapl.readWatts().isEmpty());
         }
     }
 

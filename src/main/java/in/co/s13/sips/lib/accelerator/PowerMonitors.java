@@ -58,7 +58,20 @@ public final class PowerMonitors {
      */
     public static final class LinuxRaplMonitor implements PowerMonitor {
 
-        private static final Path ENERGY = Path.of("/sys/class/powercap/intel-rapl:0/energy_uj");
+        // Kept as text, not a Path. Windows rejects the colon in "intel-rapl:0"
+        // with an InvalidPathException, and building it in a static initialiser
+        // turned that into a NoClassDefFoundError for every caller -- including
+        // ones that only wanted to ask whether RAPL was available and be told no.
+        private static final String ENERGY = "/sys/class/powercap/intel-rapl:0/energy_uj";
+
+        /** The counter, or empty on a platform whose paths cannot express it. */
+        private static Optional<Path> energyFile() {
+            try {
+                return Optional.of(Path.of(ENERGY));
+            } catch (java.nio.file.InvalidPathException ex) {
+                return Optional.empty();
+            }
+        }
 
         @Override
         public String name() {
@@ -75,10 +88,11 @@ public final class PowerMonitors {
             if (!System.getProperty("os.name", "").toLowerCase().contains("linux")) {
                 return "RAPL is exposed through sysfs on Linux only";
             }
-            if (!Files.exists(ENERGY)) {
+            Path energy = energyFile().orElse(null);
+            if (energy == null || !Files.exists(energy)) {
                 return "no RAPL counter at " + ENERGY + "; the CPU or kernel does not expose one";
             }
-            if (!Files.isReadable(ENERGY)) {
+            if (!Files.isReadable(energy)) {
                 return ENERGY + " is not readable; many distributions restrict it to root "
                         + "after CVE-2020-8694";
             }
@@ -115,7 +129,9 @@ public final class PowerMonitors {
         }
 
         private long readMicrojoules() throws java.io.IOException {
-            return Long.parseLong(Files.readString(ENERGY).trim());
+            Path energy = energyFile().orElseThrow(
+                    () -> new java.io.IOException("no readable path for " + ENERGY));
+            return Long.parseLong(Files.readString(energy).trim());
         }
     }
 
