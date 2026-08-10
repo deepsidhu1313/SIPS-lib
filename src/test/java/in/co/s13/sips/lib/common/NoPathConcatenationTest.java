@@ -51,6 +51,13 @@ class NoPathConcatenationTest {
     private static final Path SOURCES = Path.of("src", "main", "java");
 
     /**
+     * Marks a line where a forward slash is correct and deliberate — a tar
+     * entry name, or a value stored for another machine to read. Requiring a
+     * written reason keeps it from becoming a way to silence the check.
+     */
+    private static final String ALLOWED = "// path-ok:";
+
+    /**
      * A separator immediately beside a {@code +}: {@code "…/" +} or
      * {@code + "/…"}. Two backslashes are required for the escaped form, which
      * keeps {@code "\n"} and {@code "\t"} out of the results.
@@ -71,7 +78,8 @@ class NoPathConcatenationTest {
                 List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
                 for (int i = 0; i < lines.size(); i++) {
                     String line = lines.get(i).strip();
-                    if (line.startsWith("*") || line.startsWith("//")) {
+                    if (line.startsWith("*") || line.startsWith("//")
+                            || line.contains(ALLOWED)) {
                         continue;
                     }
                     if (JOINED_SEPARATOR.matcher(line).find()) {
@@ -100,7 +108,8 @@ class NoPathConcatenationTest {
                 List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
                 for (int i = 0; i < lines.size(); i++) {
                     String line = lines.get(i).strip();
-                    if (line.startsWith("*") || line.startsWith("//")) {
+                    if (line.startsWith("*") || line.startsWith("//")
+                            || line.contains(ALLOWED)) {
                         continue;
                     }
                     if (searching.matcher(line).find()) {

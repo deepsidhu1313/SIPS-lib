@@ -227,4 +227,53 @@ class SipsPathsTest {
         assertTrue(SipsPaths.lastElement("").isEmpty());
         assertTrue(SipsPaths.lastElement(null).isEmpty());
     }
+
+    // ---- values that leave this machine ----
+
+    @Test
+    void aStoredPathLooksTheSameOnEveryPlatform() {
+        // The AST database records which source file a chunk came from, and a
+        // node on another operating system reads it back. A Windows master
+        // writing "pkg\\sub\\Main.java" there is a mismatch nobody sees until
+        // the node cannot find the file.
+        assertEquals("pkg/sub/Main.java", SipsPaths.canonical("pkg\\sub\\Main.java"));
+        assertEquals("pkg/sub/Main.java", SipsPaths.canonical("/pkg/sub/Main.java"));
+        assertEquals("pkg/sub/Main.java", SipsPaths.canonical("pkg//sub\\/Main.java"));
+        assertEquals("", SipsPaths.canonical(null));
+        assertEquals("", SipsPaths.canonical("  "));
+    }
+
+    @Test
+    void aCanonicalValueCanBeTurnedBackIntoALocalPath() {
+        // The round trip that makes storing one safe: join accepts either
+        // separator in a later segment.
+        String stored = SipsPaths.canonical("pkg\\sub\\Main.java");
+
+        assertEquals(SipsPaths.join("data", "job", "pkg", "sub", "Main.java"),
+                SipsPaths.join("data", "job", stored));
+    }
+
+    @Test
+    void findsThePartOfAPathBelowANamedAncestor() {
+        String source = SipsPaths.join("home", "nika", "project", "src", "pkg", "sub");
+
+        assertEquals(Path.of("pkg", "sub").toString(),
+                SipsPaths.relativeToAncestor(source, "src").orElseThrow());
+    }
+
+    @Test
+    void aDirectoryMerelyStartingWithTheNameIsNotAMatch() {
+        // The old code did dir.substring(dir.lastIndexOf("src") + 3), so a
+        // project under "srcfoo" matched and the result was silently wrong.
+        String source = SipsPaths.join("home", "nika", "srcfoo", "pkg");
+
+        assertTrue(SipsPaths.relativeToAncestor(source, "src").isEmpty());
+    }
+
+    @Test
+    void aFileDirectlyInTheAncestorHasNothingBelowIt() {
+        String source = SipsPaths.join("home", "nika", "project", "src");
+
+        assertEquals("", SipsPaths.relativeToAncestor(source, "src").orElseThrow());
+    }
 }

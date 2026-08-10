@@ -154,4 +154,85 @@ public final class SipsPaths {
         Path name = Path.of(path.replace('\\', '/')).getFileName();
         return name == null ? Optional.empty() : Optional.of(name.toString());
     }
+
+    /**
+     * A path in the one form that means the same thing everywhere: forward
+     * slashes, no root.
+     *
+     * <p>For values that are <em>stored</em> rather than opened — a source file
+     * recorded in the AST database, a manifest entry, a name sent to another
+     * node. Those cross machines, and a Windows master writing
+     * {@code pkg\sub\Main.java} into a database that a Linux node reads back
+     * is a mismatch nobody sees until the node cannot find the file.
+     *
+     * <p>{@link #join} accepts either separator in its later segments, so a
+     * canonical value can always be turned back into a local path on arrival.
+     */
+    /**
+     * Joins segments into the canonical, portable form.
+     *
+     * <p>The counterpart to {@link #join} for values that are stored or sent
+     * rather than opened.
+     */
+    public static String canonicalJoin(String... segments) {
+        if (segments == null) {
+            return "";
+        }
+        StringBuilder all = new StringBuilder();
+        for (String segment : segments) {
+            String piece = canonical(segment);
+            if (piece.isEmpty()) {
+                continue;
+            }
+            if (all.length() > 0) {
+                all.append('/');
+            }
+            all.append(piece);
+        }
+        return all.toString();
+    }
+
+    public static String canonical(String path) {
+        if (path == null || path.isBlank()) {
+            return "";
+        }
+        String slashed = path.replace('\\', '/');
+        StringBuilder canonical = new StringBuilder();
+        for (String piece : slashed.split("/+")) {
+            if (piece.isBlank()) {
+                continue;
+            }
+            if (canonical.length() > 0) {
+                canonical.append('/');
+            }
+            canonical.append(piece);
+        }
+        return canonical.toString();
+    }
+
+    /**
+     * The part of a path below a named ancestor.
+     *
+     * <p>Replaces {@code dir.substring(dir.lastIndexOf("src") + 3)}, which is
+     * wrong twice: it searches text, so a project living under {@code srcfoo}
+     * matches, and the offset it adds assumes a separator width. Walking
+     * elements does neither.
+     *
+     * @return the elements below the deepest element named {@code name}, or
+     *         empty if no element has that name
+     */
+    public static Optional<String> relativeToAncestor(String path, String name) {
+        if (path == null || path.isBlank() || name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        Path whole = Path.of(path.replace('\\', '/'));
+        for (Path candidate = whole; candidate != null; candidate = candidate.getParent()) {
+            Path element = candidate.getFileName();
+            if (element != null && element.toString().equals(name)) {
+                Path below = candidate.relativize(whole);
+                return Optional.of(below.toString());
+            }
+        }
+        return Optional.empty();
+    }
 }
