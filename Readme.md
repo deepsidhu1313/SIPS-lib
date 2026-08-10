@@ -17,6 +17,7 @@ The library a SIPS program links against, plus the types shared by every module.
 | `in.co.s13.sips.lib.job` | `Job`, `Stage`, `JobSequencer`, `JobRunner` — pipelines, not just loops |
 | `in.co.s13.sips.lib.lambda` | `ClusterCall` — one function, some bytes, a policy deciding where it runs |
 | `in.co.s13.sips.lib.manifest` | `TaskType`: how a manifest says a chunk is Java or WebAssembly |
+| `in.co.s13.sips.lib.db` | `Migrator` and `SettingsMigrator` — schema and settings changes that reach existing installations |
 | `in.co.s13.sips.scheduler` | `Scheduler`, plus the two policy SPIs: `LoopPolicy` and `PlacementPolicy` |
 
 ## Build
@@ -33,6 +34,8 @@ Requires **JDK 21**.
   microsecond start changes what a scheduler can do
 - [Task graphs](docs/TASK_GRAPHS.md) — pipelines, placement policies, and what
   each is measured to be worth
+- [Migrations](docs/MIGRATIONS.md) — how a schema or settings change reaches a
+  node that already exists
 - [Accelerators and image processing](docs/ACCELERATORS.md)
 - [Parallel loops](../SIPS-Node/docs/PARALLEL_LOOPS.md) — `break`, `continue`, early exit
 - [Architecture](../SIPS-Node/docs/ARCHITECTURE.md)
