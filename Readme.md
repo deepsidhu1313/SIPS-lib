@@ -10,7 +10,7 @@ The library a SIPS program links against, plus the types shared by every module.
 |---|---|
 | `in.co.s13.sips.lib` | The `SIPS` class user programs call: `parallelFor()`, `simulateSection()`, `saveObject()`, `resolveObject()` |
 | `in.co.s13.sips.lib.common.datastructure` | `Node`, `SIPSTask`, `ParallelForLoop`, `IPAddress` and friends |
-| `in.co.s13.sips.lib.accelerator` | Compute device discovery: OpenCL, CPU, and probing stubs for CUDA/ROCm/Metal/Vulkan/NPU |
+| `in.co.s13.sips.lib.accelerator` | Compute device discovery (OpenCL, CPU, probing stubs for CUDA/ROCm/Metal/Vulkan/NPU), `ImageKernel` and `MatrixKernel` |
 | `in.co.s13.sips.lib.image` | `TileGrid` and `Tile`: two-dimensional decomposition with halo |
 | `in.co.s13.sips.lib.loop` | `EarlyExit`: what `breakAll` and `breakAfter` mean across machines |
 | `in.co.s13.sips.lib.wasm` | `WasmTask`, `WasmRunner`, `WasmHost` — a chunk as a precompiled module |

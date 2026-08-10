@@ -125,6 +125,67 @@ story makes cross-node reproducibility a genuine differentiator). Gradient
 compression before the wire. Stale-tolerant averaging for stragglers, starting
 from the duplicate-chunk machinery that already exists.
 
+## Accelerators
+
+Training's inner loop is dense float GEMM, which is the one thing a GPU is
+unambiguously for — unlike the image kernels, which are memory-bound and where a
+GPU mostly waits on transfers.
+
+`MatrixKernel` is the type a researcher implements: one operation written twice,
+as OpenCL C and as Java. It is the float counterpart of `ImageKernel`, and the
+contract differs in one important way. Image kernels must agree **bit for bit**,
+because neighbouring tiles of one picture land on different devices and any
+difference is a visible seam — which is what forces them to integers. Nothing
+about training works that way: it is stochastic already, models are judged by
+loss rather than bit equality, and a weight differing in its last mantissa bit is
+indistinguishable from a different shuffle seed. So matrix kernels agree to a
+**declared relative tolerance**, and `MatrixKernelConformanceTest` holds every
+registered kernel to the number it declares, on every device the machine has.
+
+Shipped: `gemm`, `gemm_tiled`, `gemm_at_b` (the backward pass's shape, without
+materialising the transpose) and `softmax_rows`.
+
+### Measured
+
+macOS, Intel i7-9750H against an AMD Radeon Pro 5300M, square GEMM, best of five
+after warmup:
+
+| n | CPU | GPU (tiled) | speedup |
+|---|---|---|---|
+| 256 | 7 ms (4.8 GF/s) | 2 ms (16.8 GF/s) | 3.5× |
+| 512 | 62 ms (4.3 GF/s) | 9 ms (29.8 GF/s) | 6.9× |
+| 768 | 290 ms (3.1 GF/s) | 16 ms (56.6 GF/s) | 18.1× |
+| 1024 | 674 ms (3.2 GF/s) | 34 ms (63.2 GF/s) | 19.8× |
+
+Two things that measurement caught, both of which would have made the feature
+decorative:
+
+- **An executor per call is slower than the CPU.** Compiling a kernel costs tens
+  of milliseconds against a fraction of one to run it. The first version built
+  one per multiply and lost to the CPU at every size; executors are now cached
+  per thread.
+- **The naive kernel is only at parity.** Every work item re-reading whole rows
+  from global memory leaves the device waiting on memory — about 4 GF/s, the same
+  as the CPU. `gemm_tiled` stages tiles through local memory and is what produces
+  the numbers above.
+
+### Choosing a device
+
+`MatrixCompute` prefers the tiled kernel, falls back to the plain one on a device
+whose work-group limit will not take a 16×16 group, and to the CPU otherwise —
+identical arithmetic in every case. That fallback is not hypothetical: on this
+machine the OpenCL **CPU device refuses the group** and takes the plain kernel,
+which the conformance run reports.
+
+Small problems stay on the CPU regardless. Below roughly a million
+multiply-accumulates the transfer costs more than the arithmetic saves, and a
+kernel says how its work scales — a row-wise softmax scales with the row, not
+with `k`, so a narrow one is never worth sending.
+
+**Determinism:** a caller needing bit-reproducibility should use
+`multiplyOnCpu`, or run the job as WebAssembly, where floats *are* pinned across
+nodes.
+
 ## What this deliberately is not
 
 - **Not a deep-learning framework.** No autograd, no GPU training. The GPU
