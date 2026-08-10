@@ -4,7 +4,7 @@ What it takes to train a model across the cluster and actually beat one machine
 — which paradigms fit this framework, which one to build first, and in what
 order the missing pieces go in.
 
-**Status: phases 0 and 1 built, with accelerator support.** Everything above a
+**Status: phases 0–2 built, with accelerator support.** Everything above a
 phase number is analysis; the phases say what is implemented.
 
 ## How training is distributed, and what each way costs
@@ -121,11 +121,29 @@ inline exactly as a WASM one does, so a stage written either way behaves the sam
 Still open in this phase: **benchmark-weighted shard sizes**, so a heterogeneous
 cluster reaches each barrier together rather than waiting on the slowest node.
 
-**Phase 2 — convergence and scale.** An iterative runner that appends rounds
-until a stop condition instead of fixing R up front, using the `breakAfter`
-machinery. File-server path for models over the inline cap, chosen
-automatically. Per-round loss recorded beside the per-chunk timings the
-warehouses already keep.
+**Phase 2 — convergence and scale (built).** `TrainingRun` and `StopWhen`
+replace a fixed round count, which is a guess in both directions: too few and
+the model is undertrained, too many and the cluster exchanges weights that no
+longer move — neither of which shows up as a failure. `StopWhen` is one method,
+so a criterion the built-ins do not cover (a validation metric, a wall-clock or
+energy budget from the power monitors) needs no change to the runner. Divergence
+ends a run outright rather than waiting for the criterion, because nothing
+recovers from a NaN and every further round is wasted cluster time. Every round
+is kept, and the best loss is reported separately from the last — FedAvg can
+overshoot, and reporting the final loss would understate a run that had already
+found something better.
+
+`ShardPlan` divides the data by benchmark score, closing the last phase‑1 gap. A
+round ends when its slowest worker ends, so equal shards on unequal machines
+waste the difference *every round*. FedAvg already weights each model by its
+sample count, so unequal shards cost nothing in accuracy — which is what makes
+this free. Ordinary loop scheduling cannot do this job: GSS and its relatives
+balance by handing out more batches to whoever returns first, and here each
+worker gets exactly one shard for the whole round, so the division has to be
+right the first time.
+
+Still open in this phase: the **file-server path for models over the 256 KB
+inline cap**, chosen automatically.
 
 **Phase 3 — research surface.** WASM training kernels (the bit-identical float
 story makes cross-node reproducibility a genuine differentiator). Gradient
