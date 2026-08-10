@@ -53,6 +53,29 @@ public interface MatrixKernelExecutor extends AutoCloseable {
      */
     float[] execute(MatrixKernel kernel, float[] a, float[] b, int m, int k, int n);
 
+    /**
+     * Applies a kernel down a chain: {@code ((a·rights[0])·rights[1])·…}.
+     *
+     * <p>The default is the honest fallback — one {@link #execute} per link,
+     * paying the full transfer each time. A device executor overrides it to
+     * keep the running product resident, which is the entire point: the
+     * intermediate is O(n²) bytes that would otherwise cross the bus down and
+     * straight back up between every pair of links.
+     *
+     * @param rightCols the column count of each right operand; its row count
+     *        is the previous link's columns
+     */
+    default float[] chain(MatrixKernel kernel, float[] a, int m, int k,
+            java.util.List<float[]> rights, int[] rightCols) {
+        float[] current = a;
+        int currentCols = k;
+        for (int i = 0; i < rights.size(); i++) {
+            current = execute(kernel, current, rights.get(i), m, currentCols, rightCols[i]);
+            currentCols = rightCols[i];
+        }
+        return current;
+    }
+
     @Override
     void close();
 }

@@ -181,6 +181,7 @@ public final class ArrayCompute {
                     yield new Mat(of.cols(), of.rows(), transposed);
                 }
                 case ROW_SUM, ROW_MAX, ROW_ARG_MAX -> reduce(node);
+                case COL_SUM, SUM_ALL -> reduceColumns(node);
                 default -> sweep(node);
             };
             memo.put(node, value);
@@ -198,6 +199,35 @@ public final class ArrayCompute {
             }
             materialised++;
             return new Mat(node.rows(), node.cols(), out);
+        }
+
+        /**
+         * A column-crossing reduction — one pass over the fused chain, with
+         * per-column accumulators in double so a tall matrix summed in float
+         * does not drift.
+         */
+        private Mat reduceColumns(Expr node) {
+            Expr of = node.left();
+            Source source = source(of);
+            double[] totals = new double[of.cols()];
+            for (int r = 0; r < of.rows(); r++) {
+                for (int c = 0; c < of.cols(); c++) {
+                    totals[c] += source.at(r, c);
+                }
+            }
+            materialised++;
+            if (node.kind() == Expr.Kind.SUM_ALL) {
+                double total = 0;
+                for (double column : totals) {
+                    total += column;
+                }
+                return new Mat(1, 1, new float[]{(float) total});
+            }
+            float[] out = new float[of.cols()];
+            for (int c = 0; c < of.cols(); c++) {
+                out[c] = (float) totals[c];
+            }
+            return new Mat(1, of.cols(), out);
         }
 
         /**

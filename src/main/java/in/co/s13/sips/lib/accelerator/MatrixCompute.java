@@ -140,6 +140,36 @@ public final class MatrixCompute {
     /** Set once a device has been tried and found unusable, so it is not retried. */
     private static volatile boolean acceleratorUnusable;
 
+    /** The chain on this thread's device, or null -- same policy as multiply. */
+    private static float[] chainOnAccelerator(float[] a, int m, int k,
+            java.util.List<float[]> rights, int[] rightCols) {
+        if (acceleratorUnusable) {
+            return null;
+        }
+        try {
+            MatrixKernelExecutor executor = EXECUTOR.get();
+            if (executor == null) {
+                Device device = matrixDevice().orElse(null);
+                if (device == null) {
+                    acceleratorUnusable = true;
+                    return null;
+                }
+                executor = new OpenCLMatrixExecutor(device);
+                EXECUTOR.set(executor);
+            }
+            MatrixKernel kernel = executor.supports(MatrixKernels.GEMM_TILED)
+                    ? MatrixKernels.GEMM_TILED : MatrixKernels.GEMM;
+            if (!executor.supports(kernel)) {
+                return null;
+            }
+            return executor.chain(kernel, a, m, k, rights, rightCols);
+        } catch (RuntimeException | Error ex) {
+            releaseThreadExecutor();
+            acceleratorUnusable = true;
+            return null;
+        }
+    }
+
     private static float[] onAccelerator(MatrixKernel kernel, float[] a, float[] b,
             int m, int k, int n) {
         if (acceleratorUnusable) {
@@ -217,6 +247,66 @@ public final class MatrixCompute {
      * @param b {@code k × n}
      * @return {@code m × n}
      */
+    /**
+     * Multiplies down a chain, keeping the running product on the device when
+     * one is available: {@code ((a·rights[0])·rights[1])·…}.
+     *
+     * <p>Every link's intermediate would otherwise be downloaded only to be
+     * uploaded straight back. Whether avoiding that is worth anything is a
+     * measured question — transfer is O(n²) against O(n³) compute per link, so
+     * the saving shrinks as matrices grow — and the ArrayProgramming sample
+     * publishes the numbers rather than assuming them.
+     *
+     * @param rightCols column count of each right operand; row count is the
+     *        previous link's columns
+     */
+    public static float[] chain(float[] a, int m, int k, java.util.List<float[]> rights,
+            int[] rightCols) {
+        if (a == null || a.length != m * k) {
+            throw new IllegalArgumentException("A must be " + m + "x" + k);
+        }
+        if (rights == null || rights.isEmpty() || rightCols == null
+                || rights.size() != rightCols.length) {
+            throw new IllegalArgumentException("A chain needs matching rights and rightCols; "
+                    + "got " + (rights == null ? 0 : rights.size()) + " matrices and "
+                    + (rightCols == null ? 0 : rightCols.length) + " widths");
+        }
+        int currentCols = k;
+        for (int i = 0; i < rights.size(); i++) {
+            if (rights.get(i) == null || rights.get(i).length != currentCols * rightCols[i]) {
+                throw new IllegalArgumentException("Link " + i + " must be " + currentCols
+                        + "x" + rightCols[i] + " (" + (currentCols * rightCols[i])
+                        + " values), not " + (rights.get(i) == null ? "null"
+                        : rights.get(i).length));
+            }
+            currentCols = rightCols[i];
+        }
+
+        // Worth the device only if the whole chain is: one small link would
+        // drag the resident product down anyway, so the decision is all-or-
+        // nothing, judged on the largest link.
+        long largest = 0;
+        currentCols = k;
+        for (int i = 0; i < rights.size(); i++) {
+            largest = Math.max(largest, (long) m * rightCols[i]
+                    * MatrixKernels.GEMM_TILED.workPerElement(m, currentCols, rightCols[i]));
+            currentCols = rightCols[i];
+        }
+        if (largest >= ACCELERATOR_THRESHOLD) {
+            float[] resident = chainOnAccelerator(a, m, k, rights, rightCols);
+            if (resident != null) {
+                return resident;
+            }
+        }
+        float[] current = a;
+        currentCols = k;
+        for (int i = 0; i < rights.size(); i++) {
+            current = multiply(current, rights.get(i), m, currentCols, rightCols[i]);
+            currentCols = rightCols[i];
+        }
+        return current;
+    }
+
     public static float[] multiplyTransposed(float[] a, float[] b, int m, int k, int n) {
         checkShape(m, k, n);
         require(a != null && b != null, "matrices must not be null");

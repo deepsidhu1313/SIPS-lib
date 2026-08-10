@@ -19,6 +19,8 @@ package in.co.s13.sips.lib.array;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * A computation described before it is run.
@@ -45,7 +47,7 @@ public final class Expr {
     /** Every operation the evaluator understands. */
     public enum Kind {
         INPUT, MATMUL, TRANSPOSE, ADD, SUB, MUL, ADD_ROW,
-        RELU, EXP, SCALE, PLUS, ROW_SUM, ROW_MAX, ROW_ARG_MAX
+        RELU, EXP, SCALE, PLUS, ROW_SUM, ROW_MAX, ROW_ARG_MAX, COL_SUM, SUM_ALL
     }
 
     private final Kind kind;
@@ -197,6 +199,22 @@ public final class Expr {
         return new Expr(Kind.ROW_ARG_MAX, rows, 1, this, null, null, 0);
     }
 
+    /**
+     * The sum of each column, as a single row.
+     *
+     * <p>Crosses rows, which changes the distribution story: no row shard can
+     * produce it alone, but every shard can produce its partial and the
+     * partials add — {@code RowSplit.planReduce} rather than {@code plan}.
+     */
+    public Expr colSum() {
+        return new Expr(Kind.COL_SUM, 1, cols, this, null, null, 0);
+    }
+
+    /** The sum of everything, as a 1x1 matrix. Crosses rows, like colSum. */
+    public Expr sumAll() {
+        return new Expr(Kind.SUM_ALL, 1, 1, this, null, null, 0);
+    }
+
     public int rows() {
         return rows;
     }
@@ -290,6 +308,12 @@ public final class Expr {
             case ROW_ARG_MAX -> {
                 return left.withInputRows(inputsToResize, newRows).rowArgMax();
             }
+            case COL_SUM -> {
+                return left.withInputRows(inputsToResize, newRows).colSum();
+            }
+            case SUM_ALL -> {
+                return left.withInputRows(inputsToResize, newRows).sumAll();
+            }
             default -> throw new IllegalStateException("Unhandled kind " + kind);
         }
     }
@@ -297,5 +321,106 @@ public final class Expr {
     @Override
     public String toString() {
         return kind + "[" + rows + "x" + cols + "]";
+    }
+
+    /** The wire format version {@link #toJson} writes. */
+    public static final int JSON_VERSION = 1;
+
+    /**
+     * This expression as a JSON document a manifest can carry.
+     *
+     * <p>Everything else in a SIPS job already travels as JSON — the manifest,
+     * the chunk spec, the stage graph. Serialised, the graph a researcher
+     * built on a laptop is exactly what every node evaluates.
+     *
+     * <p>v1 serialises the tree, so a shared subexpression appears once per
+     * use and is evaluated once per use after the round trip — identical
+     * answers, duplicated work. A caller with a large shared subtree should
+     * bind it as an input instead. Pinned by a test, so if the codec ever
+     * learns references the docs get updated with it.
+     */
+    public JSONObject toJson() {
+        return encode(this).put("v", JSON_VERSION);
+    }
+
+    private static JSONObject encode(Expr node) {
+        JSONObject out = new JSONObject().put("op", node.kind.name());
+        switch (node.kind) {
+            case INPUT -> out.put("name", node.name)
+                    .put("rows", node.rows).put("cols", node.cols);
+            case SCALE, PLUS -> {
+                // A float widened to double is exact, so the scalar survives
+                // the JSON number without rounding: the worker computes with
+                // the same bits the laptop did.
+                out.put("s", (double) node.scalar);
+                out.put("left", encode(node.left));
+            }
+            default -> {
+                out.put("left", encode(node.left));
+                if (node.right != null) {
+                    out.put("right", encode(node.right));
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Rebuilds an expression from its document, through the same constructors
+     * that checked the shapes the first time.
+     *
+     * <p>A manifest is input from the network; parsing must not be the one
+     * place shapes go unverified. A hostile or corrupted document fails
+     * exactly as the equivalent source line would have.
+     */
+    public static Expr fromJson(JSONObject document) {
+        if (document == null) {
+            throw new IllegalArgumentException("There is no expression document to read");
+        }
+        int version = document.optInt("v", -1);
+        if (version != JSON_VERSION) {
+            throw new IllegalArgumentException("Expression document version " + version
+                    + " is not understood; this build reads version " + JSON_VERSION);
+        }
+        try {
+            return decode(document);
+        } catch (JSONException malformed) {
+            throw new IllegalArgumentException("Malformed expression document: "
+                    + malformed.getMessage(), malformed);
+        }
+    }
+
+    private static Expr decode(JSONObject node) {
+        String op = node.optString("op", "");
+        return switch (op) {
+            case "INPUT" -> input(node.getString("name"),
+                    node.getInt("rows"), node.getInt("cols"));
+            case "MATMUL" -> decode(node.getJSONObject("left"))
+                    .matmul(decode(node.getJSONObject("right")));
+            case "TRANSPOSE" -> decode(node.getJSONObject("left")).transpose();
+            case "ADD" -> decode(node.getJSONObject("left"))
+                    .add(decode(node.getJSONObject("right")));
+            case "SUB" -> decode(node.getJSONObject("left"))
+                    .sub(decode(node.getJSONObject("right")));
+            case "MUL" -> decode(node.getJSONObject("left"))
+                    .mul(decode(node.getJSONObject("right")));
+            case "ADD_ROW" -> decode(node.getJSONObject("left"))
+                    .addRow(decode(node.getJSONObject("right")));
+            case "RELU" -> decode(node.getJSONObject("left")).relu();
+            case "EXP" -> decode(node.getJSONObject("left")).exp();
+            case "SCALE" -> decode(node.getJSONObject("left"))
+                    .scale((float) node.getDouble("s"));
+            case "PLUS" -> decode(node.getJSONObject("left"))
+                    .plus((float) node.getDouble("s"));
+            case "ROW_SUM" -> decode(node.getJSONObject("left")).rowSum();
+            case "ROW_MAX" -> decode(node.getJSONObject("left")).rowMax();
+            case "ROW_ARG_MAX" -> decode(node.getJSONObject("left")).rowArgMax();
+            case "COL_SUM" -> decode(node.getJSONObject("left")).colSum();
+            case "SUM_ALL" -> decode(node.getJSONObject("left")).sumAll();
+            default -> throw new IllegalArgumentException("Unknown op '" + op
+                    + "' in expression document; this build understands version "
+                    + JSON_VERSION + " ops only. A newer sender should not hand "
+                    + "newer expressions to an older node.");
+        };
     }
 }

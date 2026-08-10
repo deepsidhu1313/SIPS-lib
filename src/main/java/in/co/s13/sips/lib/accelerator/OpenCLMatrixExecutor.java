@@ -201,6 +201,79 @@ public final class OpenCLMatrixExecutor implements MatrixKernelExecutor {
         return out;
     }
 
+    /**
+     * The chain with the running product resident on the device.
+     *
+     * <p>Each link uploads only its right operand; the left operand is the
+     * previous link's output buffer, which never visits the host. One download
+     * at the end. The saving per link is exactly the O(n²) intermediate that
+     * {@link #execute} would move down and straight back up — measured in the
+     * ArrayProgramming sample rather than assumed, because transfer shrinks
+     * relative to O(n³) compute as matrices grow.
+     */
+    @Override
+    public float[] chain(MatrixKernel kernel, float[] a, int m, int k,
+            java.util.List<float[]> rights, int[] rightCols) {
+        if (closed) {
+            throw new IllegalStateException("Executor is closed");
+        }
+        cl_kernel clKernel = compiled.computeIfAbsent(kernel.name(), name -> build(kernel));
+
+        cl_mem current = null;
+        cl_mem bufferB = null;
+        cl_mem product = null;
+        try {
+            current = CL.clCreateBuffer(context, CL.CL_MEM_READ_ONLY | CL.CL_MEM_COPY_HOST_PTR,
+                    (long) Sizeof.cl_float * a.length, Pointer.to(a), null);
+            int currentCols = k;
+            for (int link = 0; link < rights.size(); link++) {
+                float[] b = rights.get(link);
+                int n = rightCols[link];
+                bufferB = CL.clCreateBuffer(context,
+                        CL.CL_MEM_READ_ONLY | CL.CL_MEM_COPY_HOST_PTR,
+                        (long) Sizeof.cl_float * b.length, Pointer.to(b), null);
+                // READ_WRITE rather than WRITE_ONLY: this link's output is the
+                // next link's left operand.
+                product = CL.clCreateBuffer(context, CL.CL_MEM_READ_WRITE,
+                        (long) Sizeof.cl_float * m * n, null, null);
+
+                CL.clSetKernelArg(clKernel, 0, Sizeof.cl_mem, Pointer.to(current));
+                CL.clSetKernelArg(clKernel, 1, Sizeof.cl_mem, Pointer.to(bufferB));
+                CL.clSetKernelArg(clKernel, 2, Sizeof.cl_mem, Pointer.to(product));
+                CL.clSetKernelArg(clKernel, 3, Sizeof.cl_int,
+                        Pointer.to(new int[]{m}));
+                CL.clSetKernelArg(clKernel, 4, Sizeof.cl_int,
+                        Pointer.to(new int[]{currentCols}));
+                CL.clSetKernelArg(clKernel, 5, Sizeof.cl_int,
+                        Pointer.to(new int[]{n}));
+
+                int tile = kernel.tileSize();
+                long[] global = tile > 0
+                        ? new long[]{roundUp(m, tile), roundUp(n, tile)}
+                        : new long[]{m, n};
+                long[] local = tile > 0 ? new long[]{tile, tile} : null;
+                CL.clEnqueueNDRangeKernel(queue, clKernel, 2, null, global, local,
+                        0, null, null);
+
+                release(current);
+                release(bufferB);
+                bufferB = null;
+                current = product;
+                product = null;
+                currentCols = n;
+            }
+
+            float[] out = new float[m * currentCols];
+            CL.clEnqueueReadBuffer(queue, current, CL.CL_TRUE, 0,
+                    (long) Sizeof.cl_float * out.length, Pointer.to(out), 0, null, null);
+            return out;
+        } finally {
+            release(current);
+            release(bufferB);
+            release(product);
+        }
+    }
+
     private static long roundUp(int value, int multiple) {
         return ((value + multiple - 1L) / multiple) * multiple;
     }
