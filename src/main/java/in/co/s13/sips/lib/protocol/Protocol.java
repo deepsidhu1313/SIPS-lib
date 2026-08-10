@@ -57,7 +57,7 @@ public final class Protocol {
      * <p>Raise it when a change would confuse a node running the previous
      * release, and give the feature below the new number.
      */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     /**
      * A peer that announced no version at all.
@@ -125,7 +125,17 @@ public final class Protocol {
          * breaks rather than degrades: the alternative is a stage that
          * averages the shards it happened to receive.
          */
-        FETCHED_RESULTS(2, Compatibility.BREAKS_ON_OLDER);
+        FETCHED_RESULTS(2, Compatibility.BREAKS_ON_OLDER),
+
+        /**
+         * A file too large to inline sent as a content-addressed reference for
+         * the receiver to fetch. A version 2 node does not know the encoding,
+         * reads the absent content as empty text, and writes a zero-byte file
+         * — so a worker would run inference on a model that is not there and
+         * report success. Silent and total, which is why this breaks rather
+         * than degrades.
+         */
+        LARGE_ASSETS(3, Compatibility.BREAKS_ON_OLDER);
 
         private final int since;
         private final Compatibility compatibility;
