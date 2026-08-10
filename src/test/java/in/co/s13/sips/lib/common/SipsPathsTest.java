@@ -179,4 +179,52 @@ class SipsPathsTest {
         assertTrue(joined.startsWith("C:"), joined);
         assertTrue(joined.endsWith(Path.of("data", "job").toString()), joined);
     }
+
+    // ---- reading structure out of a path ----
+
+    @Test
+    void findsTheDirectoryAboveANamedAncestor() {
+        String chunk = SipsPaths.join("home", "nika", "sips", "proc", "uuid", "job", "0");
+
+        assertEquals(SipsPaths.join("home", "nika", "sips"),
+                SipsPaths.ancestorAbove(chunk, "proc").orElseThrow());
+    }
+
+    @Test
+    void anAncestorSearchWorksOnAPathWrittenByAnotherPlatform() {
+        // The bug this replaces was dir.substring(0, dir.lastIndexOf("/proc/")):
+        // on Windows lastIndexOf returns -1 and substring(0, -1) throws, so the
+        // caller got a StringIndexOutOfBoundsException from somewhere unrelated
+        // rather than a wrong path.
+        assertEquals(Path.of("C:/sips").toString(),
+                SipsPaths.ancestorAbove("C:\\sips\\proc\\uuid\\job", "proc").orElseThrow());
+        assertEquals(Path.of("/home/nika").toString(),
+                SipsPaths.ancestorAbove("/home/nika/proc/uuid/job", "proc").orElseThrow());
+    }
+
+    @Test
+    void anAncestorThatIsNotThereIsEmptyRatherThanAnException() {
+        assertTrue(SipsPaths.ancestorAbove(SipsPaths.join("home", "nika"), "proc").isEmpty());
+        assertTrue(SipsPaths.ancestorAbove(null, "proc").isEmpty());
+        assertTrue(SipsPaths.ancestorAbove("anything", "").isEmpty());
+    }
+
+    @Test
+    void onlyAWholeElementCountsAsAMatch() {
+        // "procession" contains "proc". A text search would match it; walking
+        // elements cannot.
+        String path = SipsPaths.join("home", "procession", "job");
+
+        assertTrue(SipsPaths.ancestorAbove(path, "proc").isEmpty());
+    }
+
+    @Test
+    void readsTheLastElementWhicheverSeparatorWroteIt() {
+        assertEquals("node-ID-job-CN-3",
+                SipsPaths.lastElement("/home/nika/proc/node-ID-job-CN-3").orElseThrow());
+        assertEquals("node-ID-job-CN-3",
+                SipsPaths.lastElement("C:\\sips\\proc\\node-ID-job-CN-3").orElseThrow());
+        assertTrue(SipsPaths.lastElement("").isEmpty());
+        assertTrue(SipsPaths.lastElement(null).isEmpty());
+    }
 }

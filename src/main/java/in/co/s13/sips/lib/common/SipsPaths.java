@@ -19,6 +19,7 @@ package in.co.s13.sips.lib.common;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Builds file paths that are correct on every platform SIPS runs on.
@@ -106,5 +107,51 @@ public final class SipsPaths {
         }
         String[] parts = className.trim().split("\\.");
         return parts.length == 1 ? parts[0] : join(parts);
+    }
+
+    /**
+     * The directory containing the named ancestor of a path.
+     *
+     * <p>Replaces {@code dir.substring(0, dir.lastIndexOf("/proc/"))}, which
+     * looks harmless and is not: on Windows the separator is a backslash, so
+     * {@code lastIndexOf} returns -1 and {@code substring(0, -1)} throws. The
+     * caller does not get a wrong path — it gets a
+     * {@link StringIndexOutOfBoundsException} from somewhere unrelated.
+     *
+     * <p>Walks path elements rather than searching text, so it is right on every
+     * platform and cannot match a directory whose name merely contains the one
+     * being looked for.
+     *
+     * @return the directory above the deepest element named {@code name}, or
+     *         empty if no element has that name
+     */
+    public static Optional<String> ancestorAbove(String path, String name) {
+        if (path == null || path.isBlank() || name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        for (Path candidate = Path.of(path.replace('\\', '/'));
+                candidate != null; candidate = candidate.getParent()) {
+            Path element = candidate.getFileName();
+            if (element != null && element.toString().equals(name)) {
+                Path parent = candidate.getParent();
+                return parent == null ? Optional.empty() : Optional.of(parent.toString());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The last element of a path — a chunk directory's own name, typically.
+     *
+     * <p>Anything that needs to read structure out of that name should take it
+     * from here rather than searching the whole path for a separator, which is
+     * what forced the platform-specific branches this replaces.
+     */
+    public static Optional<String> lastElement(String path) {
+        if (path == null || path.isBlank()) {
+            return Optional.empty();
+        }
+        Path name = Path.of(path.replace('\\', '/')).getFileName();
+        return name == null ? Optional.empty() : Optional.of(name.toString());
     }
 }

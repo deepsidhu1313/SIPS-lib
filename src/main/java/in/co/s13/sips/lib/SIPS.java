@@ -166,12 +166,12 @@ public class SIPS implements Serializable {
         Thread t = new Thread(() -> {
             try {
                 // Mobile m1 = new Mobile(obj);
-                String path = homeDir + "/.simulated/" + ClassName + "/";
+                String path = SipsPaths.join(homeDir, ".simulated", ClassName);
                 File df = new File(path);
                 if (!df.exists()) {
                     df.mkdirs();
                 }
-                path += "" + objectName + "-instance-" + instance + ".obj";
+                path = SipsPaths.join(path, objectName + "-instance-" + instance + ".obj");
                 try (FileOutputStream fos = new FileOutputStream(path); GZIPOutputStream gos = new GZIPOutputStream(fos); ObjectOutputStream oos = new ObjectOutputStream(gos)) {
                     oos.writeObject(obj);
                     oos.flush();
@@ -195,12 +195,12 @@ public class SIPS implements Serializable {
     public void sendResult(String objectName, int instance, Object obj) {
         Thread t = new Thread(() -> {
             try {
-                String path = homeDir + "/.result/" + ClassName + "/";
+                String path = SipsPaths.join(homeDir, ".result", ClassName);
                 File df = new File(path);
                 if (!df.exists()) {
                     df.mkdirs();
                 }
-                path += "" + objectName + "-instance-" + instance + ".obj";
+                path = SipsPaths.join(path, objectName + "-instance-" + instance + ".obj");
                 try (FileOutputStream fos = new FileOutputStream(path); GZIPOutputStream gos = new GZIPOutputStream(fos); ObjectOutputStream oos = new ObjectOutputStream(gos)) {
                     oos.writeObject(obj);
                     oos.flush();
@@ -208,7 +208,7 @@ public class SIPS implements Serializable {
                 String path2 = path;
                 String checksum = tools.getCheckSum(path2);
                 String workingDir = System.getProperty("user.dir");
-                JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+                JSONObject meta = tools.readJSONFile(SipsPaths.join(workingDir, "task.json"));
                 PID = meta.getString("JOB_TOKEN");
                 HOST = meta.getString("SENDER_IP");
                 CNO = meta.getString("CHUNK_NO");
@@ -217,14 +217,16 @@ public class SIPS implements Serializable {
                 String projectName = meta.getString("PROJECT");
 
                 System.out.println("Host : " + HOST + " Port: " + fileServerPort);
-                String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
+                String cacheParentDir = SipsPaths.ancestorAbove(workingDir, "proc")
+                    .orElse(workingDir);
                 final String finalPath = path;
                 new Thread(() -> {
-                    File ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+                    File ipDir = new File(SipsPaths.join(cacheParentDir, "cache", senderUUID));
                     if (!ipDir.exists()) {
                         ipDir.mkdirs();
                     }
-                    File ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/.result/" + ClassName + "/" + objectName + "-instance-" + instance + ".obj");
+                    File ip2Dir = new File(SipsPaths.join(ipDir.getAbsolutePath(), PID, ".result", ClassName,
+                            objectName + "-instance-" + instance + ".obj"));
                     if (!ip2Dir.getParentFile().exists()) {
                         ip2Dir.getParentFile().mkdirs();
                     }
@@ -352,7 +354,7 @@ public class SIPS implements Serializable {
             String path = "";
             String checksum = "";
             File ipDir, ip2Dir = null;
-            JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+            JSONObject meta = tools.readJSONFile(SipsPaths.join(workingDir, "task.json"));
             PID = meta.getString("JOB_TOKEN");
             HOST = meta.getString("SENDER_IP");
             CNO = meta.getString("CHUNK_NO");
@@ -360,15 +362,17 @@ public class SIPS implements Serializable {
             String nodeUUID = meta.getString("UUID");
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
-            path = homeDir + "/.result/" + ClassName + "/";
-            path += "" + objectname + "-instance-" + instanceNumber + ".obj";
+            path = SipsPaths.join(homeDir, ".result", ClassName);
+            path = SipsPaths.join(path, objectname + "-instance-" + instanceNumber + ".obj");
 
-            String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
-            ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+            String cacheParentDir = SipsPaths.ancestorAbove(workingDir, "proc")
+                    .orElse(workingDir);
+            ipDir = new File(SipsPaths.join(cacheParentDir, "cache", senderUUID));
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/.result/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
+            ip2Dir = new File(SipsPaths.join(ipDir.getAbsolutePath(), PID, ".result", ClassName,
+                        objectname + "-instance-" + instanceNumber + ".obj"));
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
@@ -557,17 +561,14 @@ public class SIPS implements Serializable {
         String workingDir = System.getProperty("user.dir");
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
-            if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
-            } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
-            }
+            // Read from the chunk directory's own name, so no branch on the
+            // platform's separator is needed. The branches this replaces
+            // covered Unix and Windows but not macOS, which left HOST null.
+            String chunkDirectory = SipsPaths.lastElement(workingDir).orElse("");
+            HOST = chunkDirectory.substring(0, chunkDirectory.indexOf("-ID-"));
+            PID = chunkDirectory.substring(chunkDirectory.indexOf("-ID-") + 4,
+                    chunkDirectory.lastIndexOf("-CN-"));
+            CNO = chunkDirectory.substring(chunkDirectory.lastIndexOf("-CN-") + 4);
 
             try (Socket s = new Socket(HOST, taskServerPort); OutputStream os = s.getOutputStream();
                     DataOutputStream outToServer = new DataOutputStream(os);) {
@@ -642,7 +643,7 @@ public class SIPS implements Serializable {
             String lchecksum = "";
             String checksum = null;
             File ipDir, ip2Dir = null;
-            JSONObject meta = tools.readJSONFile(workingDir + "/task.json");
+            JSONObject meta = tools.readJSONFile(SipsPaths.join(workingDir, "task.json"));
             PID = meta.getString("JOB_TOKEN");
             HOST = meta.getString("SENDER_IP");
             CNO = meta.getString("CHUNK_NO");
@@ -650,19 +651,21 @@ public class SIPS implements Serializable {
             String nodeUUID = meta.getString("UUID");
             String projectName = meta.getString("PROJECT");
             System.out.println("Host : " + HOST + " Port: " + fileServerPort);
-            String path = homeDir + "/.build/.simulated/" + ClassName + "/";
-            path += "" + objectname + "-instance-" + instanceNumber + ".obj";
+            String path = SipsPaths.join(homeDir, ".build", ".simulated", ClassName);
+            path = SipsPaths.join(path, objectname + "-instance-" + instanceNumber + ".obj");
 
             boolean Ndownloaded = true;
             long starttime = System.currentTimeMillis();
             boolean iRequestedFile = false, alreadyInQue = false;
 
-            String cacheParentDir = workingDir.substring(0, workingDir.lastIndexOf("/proc/"));
-            ipDir = new File(cacheParentDir + "/cache/" + senderUUID);
+            String cacheParentDir = SipsPaths.ancestorAbove(workingDir, "proc")
+                    .orElse(workingDir);
+            ipDir = new File(SipsPaths.join(cacheParentDir, "cache", senderUUID));
             if (!ipDir.exists()) {
                 ipDir.mkdirs();
             }
-            ip2Dir = new File(ipDir.getAbsolutePath() + "/" + PID + "/" + projectName + "/sim/" + ClassName + "/" + objectname + "-instance-" + instanceNumber + ".obj");
+            ip2Dir = new File(SipsPaths.join(ipDir.getAbsolutePath(), PID, projectName, "sim", ClassName,
+                    objectname + "-instance-" + instanceNumber + ".obj"));
             if (new File(ip2Dir.getAbsolutePath() + ".sha").exists()) {
                 lchecksum = tools.LoadCheckSum(ip2Dir.getAbsolutePath() + ".sha");
             }
@@ -803,15 +806,14 @@ public class SIPS implements Serializable {
     public void saveArrayElement(Object obj, String objectname, String position, int Instancenumber) {
         String workingDir = System.getProperty("user.dir");
         if (workingDir.contains("-ID-")) {
-            if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-            } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-            }
+            // Read from the chunk directory's own name, so no branch on the
+            // platform's separator is needed. The branches this replaces
+            // covered Unix and Windows but not macOS, which left HOST null.
+            String chunkDirectory = SipsPaths.lastElement(workingDir).orElse("");
+            HOST = chunkDirectory.substring(0, chunkDirectory.indexOf("-ID-"));
+            PID = chunkDirectory.substring(chunkDirectory.indexOf("-ID-") + 4,
+                    chunkDirectory.lastIndexOf("-CN-"));
+            CNO = chunkDirectory.substring(chunkDirectory.lastIndexOf("-CN-") + 4);
             try (Socket s = new Socket(HOST, fileServerPort); OutputStream os = s.getOutputStream();
                     DataOutputStream outToServer = new DataOutputStream(os);) {
                 JSONObject body = new JSONObject();
@@ -854,16 +856,14 @@ public class SIPS implements Serializable {
         String workingDir = System.getProperty("user.dir");
         //System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
-            if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-            } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
-            }
+            // Read from the chunk directory's own name, so no branch on the
+            // platform's separator is needed. The branches this replaces
+            // covered Unix and Windows but not macOS, which left HOST null.
+            String chunkDirectory = SipsPaths.lastElement(workingDir).orElse("");
+            HOST = chunkDirectory.substring(0, chunkDirectory.indexOf("-ID-"));
+            PID = chunkDirectory.substring(chunkDirectory.indexOf("-ID-") + 4,
+                    chunkDirectory.lastIndexOf("-CN-"));
+            CNO = chunkDirectory.substring(chunkDirectory.lastIndexOf("-CN-") + 4);
             try {
                 s = new Socket();
                 s.connect(new InetSocketAddress(HOST, fileServerPort));
@@ -931,16 +931,14 @@ public class SIPS implements Serializable {
         String workingDir = System.getProperty("user.dir");
         // System.out.println("Current working directory : " + workingDir);
         if (workingDir.contains("-ID-")) {
-            if (OS_Name == 2) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("/proc/") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-            } else if (OS_Name == 0) {
-                HOST = workingDir.substring(workingDir.lastIndexOf("\\proc\\") + 5, workingDir.indexOf("-ID"));
-                PID = workingDir.substring(workingDir.lastIndexOf("-ID-") + 4, workingDir.lastIndexOf("-CN-"));
-                CNO = workingDir.substring(workingDir.lastIndexOf("-CN-") + 4);
-
-            }
+            // Read from the chunk directory's own name, so no branch on the
+            // platform's separator is needed. The branches this replaces
+            // covered Unix and Windows but not macOS, which left HOST null.
+            String chunkDirectory = SipsPaths.lastElement(workingDir).orElse("");
+            HOST = chunkDirectory.substring(0, chunkDirectory.indexOf("-ID-"));
+            PID = chunkDirectory.substring(chunkDirectory.indexOf("-ID-") + 4,
+                    chunkDirectory.lastIndexOf("-CN-"));
+            CNO = chunkDirectory.substring(chunkDirectory.lastIndexOf("-CN-") + 4);
             try {
                 s = new Socket();
                 s.connect(new InetSocketAddress(HOST, fileServerPort));
