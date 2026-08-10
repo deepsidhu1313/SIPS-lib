@@ -110,6 +110,22 @@ public interface Node {
     public boolean equals(Object obj);
 
     public double getCPUScore();
+
+    /**
+     * Which wire protocol this node speaks, as it announced on its last ping.
+     *
+     * <p>Default so implementations that predate negotiation keep compiling,
+     * and {@link in.co.s13.sips.lib.protocol.Protocol#UNKNOWN} because that is
+     * the honest answer for a node that never said.
+     */
+    default int getProtocolVersion() {
+        return in.co.s13.sips.lib.protocol.Protocol.UNKNOWN;
+    }
+
+    /** Records what a peer announced. */
+    default void setProtocolVersion(int protocolVersion) {
+        // Implementations that track it override this; the rest stay unknown.
+    }
     
     public double getCpuAvgLoad();
     public void setCpuAvgLoad(double cpuAvgLoad);

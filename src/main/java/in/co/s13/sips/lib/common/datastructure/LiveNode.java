@@ -36,6 +36,7 @@ public class LiveNode implements Node {
     private long memory, free_memory, hdd_size, hdd_free, lastCheckedOn, lastCheckAgo;
     private ConcurrentMap<String, IPAddress> ipAddresses = new ConcurrentHashMap<>();
     private JSONObject benchmarking_results;
+    private int protocolVersion = in.co.s13.sips.lib.protocol.Protocol.UNKNOWN;
     private long distanceFromCurrent;
     private double cpuAvgLoad;
 
@@ -228,6 +229,16 @@ public class LiveNode implements Node {
     @Override
     public JSONObject getBenchmarking_results() {
         return benchmarking_results;
+    }
+
+    @Override
+    public int getProtocolVersion() {
+        return protocolVersion;
+    }
+
+    @Override
+    public void setProtocolVersion(int protocolVersion) {
+        this.protocolVersion = protocolVersion;
     }
 
     @Override

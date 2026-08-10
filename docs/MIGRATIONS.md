@@ -142,7 +142,7 @@ script change therefore ships with a restart and needs nothing — but local edi
 to those files are silently replaced. Put changes in the generator, not the
 generated file.
 
-**The wire protocol has no version negotiation.** A 1.2.x node talking to a 1.1.x
-node is untested. Manifest fields added since (`TYPE`, `STAGES`) default to the
-old behaviour when absent, so a manifest survives, but two nodes of different
-versions in one cluster is not something to rely on.
+**The wire protocol is versioned separately.** Nodes of different builds can talk
+to each other: each announces what it speaks on every ping, and work an older one
+would accept and then fail is scheduled onto the nodes that can run it. That is
+its own mechanism, described in [PROTOCOL.md](PROTOCOL.md).

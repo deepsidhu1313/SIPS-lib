@@ -18,6 +18,7 @@ The library a SIPS program links against, plus the types shared by every module.
 | `in.co.s13.sips.lib.lambda` | `ClusterCall` — one function, some bytes, a policy deciding where it runs |
 | `in.co.s13.sips.lib.manifest` | `TaskType`: how a manifest says a chunk is Java or WebAssembly |
 | `in.co.s13.sips.lib.db` | `Migrator` and `SettingsMigrator` — schema and settings changes that reach existing installations |
+| `in.co.s13.sips.lib.protocol` | `Protocol` — what a peer can be asked to do, and how it says so |
 | `in.co.s13.sips.scheduler` | `Scheduler`, plus the two policy SPIs: `LoopPolicy` and `PlacementPolicy` |
 
 ## Build
@@ -36,6 +37,8 @@ Requires **JDK 21**.
   each is measured to be worth
 - [Migrations](docs/MIGRATIONS.md) — how a schema or settings change reaches a
   node that already exists
+- [Wire protocol](docs/PROTOCOL.md) — what nodes of different versions may ask
+  of each other
 - [Accelerators and image processing](docs/ACCELERATORS.md)
 - [Parallel loops](../SIPS-Node/docs/PARALLEL_LOOPS.md) — `break`, `continue`, early exit
 - [Architecture](../SIPS-Node/docs/ARCHITECTURE.md)
