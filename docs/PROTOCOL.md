@@ -60,6 +60,7 @@ new message is dangerous to an older node:
 | `STAGED_JOBS` | 1 | **breaks** — takes the single-loop path and produces nothing |
 | `FETCHED_RESULTS` | 2 | **breaks** — the command is unknown, so the node answers nothing and the master times out |
 | `LARGE_ASSETS` | 3 | **breaks** — the encoding is unknown, so the file is written empty and inference runs on nothing |
+| `OUTBOUND_WORKERS` | 4 | ignored — an older master has no listener, so the worker never joins and is never offered work |
 
 The effect is that a half-upgraded cluster keeps working for everything that
 degrades safely, and only work that would actually be wasted is withheld.
@@ -96,6 +97,12 @@ rather than waiting for a timeout.
 1. Add it to `Protocol.Feature` with the version that introduces it, and — the
    part that takes thought — how an older node reacts to it.
 2. Raise `Protocol.VERSION` if this is the first feature in a new version.
+   Then **rebuild every module cleanly**. `VERSION` is a `static final int`, so
+   javac inlines it into every class that reads it: a module compiled against
+   an older SIPS-lib keeps announcing the older number even when it runs with a
+   newer jar. This is not hypothetical — it turned two green tests red at
+   version 4 while the jar on the classpath already said 4, and the same trap
+   applies to a node deployed without a clean build.
 3. Filter with `NodeCapabilities.capableOf` wherever the work is scheduled.
 
 A test asserts that no feature claims a version newer than the build speaks, so

@@ -57,7 +57,7 @@ public final class Protocol {
      * <p>Raise it when a change would confuse a node running the previous
      * release, and give the feature below the new number.
      */
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     /**
      * A peer that announced no version at all.
@@ -135,7 +135,16 @@ public final class Protocol {
          * report success. Silent and total, which is why this breaks rather
          * than degrades.
          */
-        LARGE_ASSETS(3, Compatibility.BREAKS_ON_OLDER);
+        LARGE_ASSETS(3, Compatibility.BREAKS_ON_OLDER),
+
+        /**
+         * Workers that dial the master rather than being dialled, because
+         * carrier NAT means nothing inbound reaches a phone. An older master
+         * has no listener for them, so such a worker simply never joins — it
+         * is not offered work and nothing goes wrong, which is why this is
+         * ignored rather than broken.
+         */
+        OUTBOUND_WORKERS(4, Compatibility.IGNORED_BY_OLDER);
 
         private final int since;
         private final Compatibility compatibility;
