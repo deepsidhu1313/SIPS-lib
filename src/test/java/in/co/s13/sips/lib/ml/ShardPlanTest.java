@@ -16,6 +16,7 @@
  */
 package in.co.s13.sips.lib.ml;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -122,5 +123,61 @@ class ShardPlanTest {
     private static ShardPlan.Shard byNode(List<ShardPlan.Shard> shards, String node) {
         return shards.stream().filter(shard -> shard.nodeUuid().equals(node))
                 .findFirst().orElseThrow();
+    }
+
+    @Test
+    void anErraticNodeLosesShareBeforeItsAverageDoes() {
+        // Two nodes with the same mean speed, one steady and one that swings.
+        // A round ends when its slowest worker ends, so what costs the barrier
+        // is the bad round, not the average round -- and by the time the mean
+        // has dropped, the tail has been stalling every round for a while.
+        //
+        // The measured basis is a sibling project's two-device fleet: per-round
+        // cost on a busy endpoint ran about twice the idle probe at p50, with
+        // p99 amplified three- to twenty-fold. A plan built from means alone
+        // hands that node work it will not return on time.
+        ShardPlan.Measured steady = new ShardPlan.Measured(10.0, 0.0);
+        ShardPlan.Measured erratic = new ShardPlan.Measured(10.0, 5.0);
+
+        assertTrue(steady.weight() > erratic.weight(),
+                "steady " + steady.weight() + " should outweigh erratic " + erratic.weight());
+    }
+
+    @Test
+    void aPerfectlySteadyNodeIsWorthItsMean() {
+        assertEquals(10.0, new ShardPlan.Measured(10.0, 0.0).weight(), 1e-9);
+    }
+
+    @Test
+    void aNodeThatIsAllNoiseIsWorthAlmostNothing() {
+        // Dispersion equal to the mean halves it; ten times the mean nearly
+        // erases it. That ordering is the whole point.
+        assertEquals(5.0, new ShardPlan.Measured(10.0, 10.0).weight(), 1e-9);
+        assertTrue(new ShardPlan.Measured(10.0, 100.0).weight() < 1.0);
+    }
+
+    @Test
+    void measurementsDivideTheDataJustAsSpeedsDo() {
+        // The same planner, so a caller with dispersion data does not need a
+        // different code path -- and one without it gets identical behaviour.
+        Map<String, ShardPlan.Measured> measured = new LinkedHashMap<>();
+        measured.put("steady", new ShardPlan.Measured(10.0, 0.0));
+        measured.put("erratic", new ShardPlan.Measured(10.0, 10.0));
+
+        List<ShardPlan.Shard> shards = ShardPlan.acrossMeasured(3000, measured);
+
+        // Looked up by name, not by position: shards come out in node-name
+        // order so that the same cluster produces the same division every run.
+        Map<String, Long> byNode = new LinkedHashMap<>();
+        shards.forEach(shard -> byNode.put(shard.nodeUuid(), shard.sampleCount()));
+        assertEquals(2000L, byNode.get("steady"), "the steady node takes twice the work");
+        assertEquals(1000L, byNode.get("erratic"));
+    }
+
+    @Test
+    void anUnmeasuredDispersionIsTreatedAsSteady() {
+        // A node benchmarked once has a mean and no spread yet. Assuming the
+        // worst would starve every newly measured machine.
+        assertEquals(10.0, new ShardPlan.Measured(10.0, -1).weight(), 1e-9);
     }
 }

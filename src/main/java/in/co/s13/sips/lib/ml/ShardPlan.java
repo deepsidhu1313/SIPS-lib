@@ -53,6 +53,39 @@ public final class ShardPlan {
     /** What an unbenchmarked node is assumed to be worth. */
     static final double UNMEASURED_SPEED = 1.0;
 
+    /**
+     * A node's measured speed and how much that measurement moves.
+     *
+     * <p>Dividing by the mean alone is right only if every node returns in
+     * about the time it usually does. A round ends when its slowest worker
+     * ends, so what costs the barrier is the bad round rather than the average
+     * one — and by the time a node's mean has dropped, its tail has been
+     * stalling every round for a while.
+     *
+     * <p>The measured basis is a sibling project's two-device fleet: per-round
+     * cost on a busy endpoint ran about twice the idle probe at p50, with p99
+     * amplified three- to twentyfold. Weighting by {@code mean / (1 + cv)}
+     * makes dispersion a leading indicator, so an erratic node loses share
+     * before its average degrades.
+     *
+     * @param dispersion the standard deviation of the measurements; negative
+     *        means it has not been measured yet, which is treated as steady —
+     *        assuming the worst would starve every newly benchmarked machine
+     */
+    public record Measured(double mean, double dispersion) {
+
+        /** The speed this node is planned against. */
+        public double weight() {
+            if (mean <= 0) {
+                return UNMEASURED_SPEED;
+            }
+            if (dispersion <= 0) {
+                return mean;
+            }
+            return mean / (1 + dispersion / mean);
+        }
+    }
+
     private ShardPlan() {
     }
 
@@ -109,6 +142,24 @@ public final class ShardPlan {
             index++;
         }
         return shards;
+    }
+
+    /**
+     * Divides {@code samples} across nodes by measured speed and steadiness.
+     *
+     * <p>The same planner as {@link #across}, so a caller holding dispersion
+     * data needs no separate code path and a caller without it behaves
+     * identically.
+     */
+    public static List<Shard> acrossMeasured(long samples, Map<String, Measured> measuredByNode) {
+        if (measuredByNode == null || measuredByNode.isEmpty()) {
+            throw new IllegalArgumentException("Sharding needs at least one node");
+        }
+        Map<String, Double> weights = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Measured> entry : measuredByNode.entrySet()) {
+            weights.put(entry.getKey(), entry.getValue().weight());
+        }
+        return across(samples, weights);
     }
 
     private static double usable(double speed) {
