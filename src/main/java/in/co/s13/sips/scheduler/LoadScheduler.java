@@ -37,6 +37,17 @@ public class LoadScheduler implements Serializable {
         this.scheduler = scheduler;
     }
 
+    /**
+     * The scheduler this is wrapping.
+     *
+     * <p>Worth being able to ask: a job's timings mean nothing without knowing
+     * which scheduler produced them, and "the one named in the manifest" is a
+     * claim rather than an observation.
+     */
+    public Scheduler scheduler() {
+        return scheduler;
+    }
+
     public ArrayList<SIPSTask> schedule(ConcurrentHashMap<String, Node> nodes, ConcurrentHashMap<String, SIPSTask> tasks, JSONObject schedulerSettings) {
         return scheduler.schedule(nodes, tasks, schedulerSettings);
     }
