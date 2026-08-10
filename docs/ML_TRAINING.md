@@ -4,8 +4,8 @@ What it takes to train a model across the cluster and actually beat one machine
 — which paradigms fit this framework, which one to build first, and in what
 order the missing pieces go in.
 
-**Status: researched and planned; phase 0 built.** Everything below the plan
-line is implemented and measured; everything above a phase number is analysis.
+**Status: phases 0 and 1 built, with accelerator support.** Everything above a
+phase number is analysis; the phases say what is implemented.
 
 ## How training is distributed, and what each way costs
 
@@ -106,13 +106,20 @@ number so the result is byte-identical whatever order results arrive),
 train₂ → …). Plus a runnable sample that drives real training through the real
 `JobRunner` and measures single-machine against parallel.
 
-**Phase 1 — the cluster path.** Inter-stage data movement in
-`DistributedStageRunner`: after a stage completes, gather its chunk outputs
-(inline results or file server) into the job's data directory and stage them as
-inputs to dependent stages. Shard affinity so round r+1's chunk i lands where
-shard i already sits. Weighted shard sizes from benchmark scores, so a
-heterogeneous cluster reaches each barrier together instead of waiting for the
-slowest node.
+**Phase 1 — the cluster path (built).** `StageOutputs` gathers a finished
+stage's results — collected by **shard**, not chunk number, because chunk numbers
+run across the whole job so round two's worker 0 is chunk 8 — and places them as
+the next stage's inputs, prefixed by producer so two producers cannot overwrite
+each other's shard 0. `ShardAffinity` sends a shard back to the node that already
+holds its data, swapping only within the nodes the scheduler chose so its balance
+survives; a remembered node that has died is ignored rather than waited for.
+`ChunkSpec` carries what the manifest cannot, because the manifest is one file
+for every chunk: the slice, the input names, the output name, and the shard index
+(distinct from the chunk number). A Java chunk now returns its declared output
+inline exactly as a WASM one does, so a stage written either way behaves the same.
+
+Still open in this phase: **benchmark-weighted shard sizes**, so a heterogeneous
+cluster reaches each barrier together rather than waiting on the slowest node.
 
 **Phase 2 — convergence and scale.** An iterative runner that appends rounds
 until a stop condition instead of fixing R up front, using the `breakAfter`
