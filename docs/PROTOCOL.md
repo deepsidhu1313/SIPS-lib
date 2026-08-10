@@ -58,6 +58,7 @@ new message is dangerous to an older node:
 | `INLINE_RESULTS` | 1 | ignored — the result is simply not collected that way |
 | `WASM_TASKS` | 1 | **breaks** — no `MAIN` in the manifest, so it throws |
 | `STAGED_JOBS` | 1 | **breaks** — takes the single-loop path and produces nothing |
+| `FETCHED_RESULTS` | 2 | **breaks** — the command is unknown, so the node answers nothing and the master times out |
 
 The effect is that a half-upgraded cluster keeps working for everything that
 degrades safely, and only work that would actually be wasted is withheld.

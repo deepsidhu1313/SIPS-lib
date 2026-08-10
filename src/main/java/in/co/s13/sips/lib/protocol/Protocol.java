@@ -57,7 +57,7 @@ public final class Protocol {
      * <p>Raise it when a change would confuse a node running the previous
      * release, and give the feature below the new number.
      */
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     /**
      * A peer that announced no version at all.
@@ -115,7 +115,17 @@ public final class Protocol {
          * master ignores the extra field, so the result is simply not collected
          * that way.
          */
-        INLINE_RESULTS(1, Compatibility.IGNORED_BY_OLDER);
+        INLINE_RESULTS(1, Compatibility.IGNORED_BY_OLDER),
+
+        /**
+         * Fetching a chunk result too large to have ridden home, by asking the
+         * node that produced it for it by name. A version 1 node does not
+         * recognise the command and answers nothing at all, so a master that
+         * needs one gets a timeout rather than a model — which is why this
+         * breaks rather than degrades: the alternative is a stage that
+         * averages the shards it happened to receive.
+         */
+        FETCHED_RESULTS(2, Compatibility.BREAKS_ON_OLDER);
 
         private final int since;
         private final Compatibility compatibility;

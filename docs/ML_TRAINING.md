@@ -142,8 +142,25 @@ balance by handing out more batches to whoever returns first, and here each
 worker gets exactly one shard for the whole round, so the division has to be
 right the first time.
 
-Still open in this phase: the **file-server path for models over the 256 KB
-inline cap**, chosen automatically.
+Models over the 256 KB inline cap are fetched rather than carried. The inline
+path is right for what a call returns — a thumbnail, a checksum — and wrong for
+a model: anything with a hidden layer is megabytes, so without this the sample
+works and a real network does not. A result too large stays in the sandbox that
+produced it and the master asks for it by name, which means the worker does not
+have to guess which of its outputs anyone wants and an uncollected result is
+removed with the sandbox rather than accumulating somewhere central. Neither
+end holds the whole thing in memory: the sender digests in one pass and streams
+in another.
+
+The transfer verifies length and checksum before handing the bytes back, and
+every read has a timeout. Both are for the same reason: a truncated model is
+still a well-formed float array, so averaging one produces a wrong answer
+rather than an error, and a node that died between finishing its chunk and
+being asked for the result would otherwise leave the master blocked with the
+whole job behind it. This is protocol version 2 — a version 1 node does not
+recognise the command and answers nothing at all, so `FETCHED_RESULTS` is
+declared `BREAKS_ON_OLDER` rather than left to degrade into a stage that
+averages whichever shards happened to arrive.
 
 **Phase 3 — research surface.** WASM training kernels (the bit-identical float
 story makes cross-node reproducibility a genuine differentiator). Gradient
