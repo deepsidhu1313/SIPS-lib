@@ -1,5 +1,16 @@
 # WebAssembly chunks
 
+> **What is WebAssembly and why is it here?** WASM is a small, portable
+> binary instruction format: any language that compiles to it (C, Rust, Go,
+> ...) produces a module any conformant runtime can execute — on a server, in
+> a JVM, on a phone. Two properties make it ideal as a unit of distributed
+> work. **Sandboxing by construction**: a module can only call the functions
+> its host explicitly provides (here, six — the import list *is* the security
+> model), so untrusted code runs without trusting it. **Deterministic floats**:
+> WASM specifies IEEE-754 exactly, so the same module gives bit-identical
+> answers on x86 and ARM — which is what lets one job run across a mixed
+> cluster and be verified. Background on why that matters: [primer §9](PRIMER.md).
+
 A SIPS chunk is normally Java source. The node writes a `build.xml`, runs Ant to
 compile it, then forks a JVM. That works, but it costs hundreds of milliseconds
 per chunk before the first iteration runs, and it puts a floor under how small a

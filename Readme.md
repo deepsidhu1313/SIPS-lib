@@ -4,6 +4,20 @@
 
 The library a SIPS program links against, plus the types shared by every module.
 
+## Start here
+
+**New to distributed computing, GPUs, or federated learning?**
+[docs/PRIMER.md](docs/PRIMER.md) teaches every concept this framework rests on
+from zero — arithmetic intensity, barriers and stragglers, robust averaging,
+float associativity — with each claim linked to the code that implements it
+and the sample that measures it. The feature docs below each open with a
+short "from zero" preamble and assume the primer for the rest.
+
+This is a research framework: designs rest on numbers measured on real
+hardware, and the negative results — the ideas that measurement refuted,
+including our own predictions — are documented with the same care as the wins
+(see the primer's negative-results register).
+
 ## What is in here
 
 | Package | Role |
@@ -19,7 +33,8 @@ The library a SIPS program links against, plus the types shared by every module.
 | `in.co.s13.sips.lib.manifest` | `TaskType`: how a manifest says a chunk is Java or WebAssembly |
 | `in.co.s13.sips.lib.db` | `Migrator` and `SettingsMigrator` — schema and settings changes that reach existing installations |
 | `in.co.s13.sips.lib.protocol` | `Protocol` — what a peer can be asked to do, and how it says so |
-| `in.co.s13.sips.lib.ml` | `Tensors`, `WeightAverage`, `FedAvgPlan` — distributed training as rounds of a task graph |
+| `in.co.s13.sips.lib.ml` | `Tensors`, `Quantized`, `WeightAverage`, `RobustAverage`, `FedAvgPlan`, `TrainingRun`, `ShardPlan`, `Population`, `Ensemble`, `WarmModels` — distributed training and inference |
+| `in.co.s13.sips.lib.array` | `Expr`, `ArrayCompute`, `RowSplit` — a lazy, fused, provably-splittable array op set ([docs](docs/ARRAY_OPS.md)) |
 | `in.co.s13.sips.scheduler` | `Scheduler`, plus the two policy SPIs: `LoopPolicy` and `PlacementPolicy` |
 
 ## Build

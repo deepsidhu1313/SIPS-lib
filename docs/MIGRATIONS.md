@@ -1,5 +1,15 @@
 # Migrations
 
+> **Why "migrations" at all?** A database schema is shared state between the
+> code and the disk, and only the code gets upgraded by a release. A migration
+> is a versioned, ordered, run-exactly-once script that carries an existing
+> installation from the old shape to the new one; a ledger table records which
+> have run, so upgrading is "run whatever the ledger has not seen, in order,
+> each in a transaction". The alternative — code that guesses the schema shape
+> at runtime — degrades into un-testable archaeology. This is the same design
+> Laravel, Rails and Flyway converged on independently, which is usually a
+> sign the shape is right.
+
 How a schema or settings change reaches an installation that already exists.
 
 ## The short version

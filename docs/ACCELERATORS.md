@@ -1,5 +1,11 @@
 # Accelerators and image processing
 
+> **Why a GPU helps, and when it does not**: [primer §2–3](PRIMER.md). The
+> one-line version — a discrete GPU is fast arithmetic behind a slow bus, so
+> it pays exactly when an operation does much more arithmetic than data
+> movement, and matmul is the operation for which that ratio grows without
+> bound. Everything below is that sentence with measurements.
+
 Two new capabilities in SIPS-lib: a device abstraction that lets a node discover
 and advertise its compute hardware, and a two-dimensional tiling model for image
 work.

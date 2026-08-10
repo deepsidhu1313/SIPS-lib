@@ -1,5 +1,8 @@
 # Mobile workers
 
+> Background: [primer §5–6](PRIMER.md) (barriers, and why communication
+> frequency must match link latency) explains every "no" in this document.
+
 Phones as SIPS nodes: what they are good for, what they are not, and what a
 worker on each platform actually has to implement.
 

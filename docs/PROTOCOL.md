@@ -1,5 +1,15 @@
 # The wire protocol
 
+> **New to protocol versioning?** The idea from zero: two programs talking
+> over a network were not necessarily built on the same day, so each message
+> format is numbered, every node announces the highest number it understands,
+> and a pair of nodes speaks the lower of their two numbers. The subtle part
+> is not the numbering — it is classifying what happens when an *older* node
+> receives something it never heard of. If it safely ignores the novelty, the
+> feature degrades gracefully; if it would produce a wrong answer (not an
+> error — a wrong answer), the newer node must never send it there. That
+> classification, per feature, is this document. Background: [primer](PRIMER.md).
+
 What one node may ask another to do, and how it finds out.
 
 ## The problem this solves

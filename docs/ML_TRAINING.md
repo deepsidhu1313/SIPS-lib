@@ -1,5 +1,15 @@
 # Distributed training on SIPS
 
+> **Start with the [primer](PRIMER.md)** if arithmetic intensity, barriers,
+> breakdown points or float associativity are new — every design choice below
+> leans on one of them. The one-paragraph version of this whole document: the
+> only training scheme whose communication pattern survives a slow network is
+> the one that exchanges *models occasionally* instead of *gradients
+> constantly* (federated averaging); everything else here is making that
+> scheme fast (weighted shards, warm models), honest (convergence stopping,
+> per-round history), and safe against real hardware (robust averaging,
+> speculative re-issue, worker eligibility).
+
 What it takes to train a model across the cluster and actually beat one machine
 — which paradigms fit this framework, which one to build first, and in what
 order the missing pieces go in.

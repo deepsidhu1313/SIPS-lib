@@ -1,5 +1,18 @@
 # Task graphs
 
+> **The concept from zero.** A single parallel loop describes one step done
+> many times. Real jobs are *pipelines*: step B needs what step A produced,
+> C needs both, D is independent of all of them. Drawn with arrows this is a
+> directed acyclic graph (DAG), and it carries two distinct kinds of edge:
+> *ordering* ("B after A") and *data flow* ("B reads A's output" — which
+> implies the ordering and also means bytes must move). Given the graph, a
+> scheduler can see which stages may run at once, which node should host
+> which stage (data already in the right place is transfer avoided), and
+> where the critical path lies — the chain of dependent stages that bounds
+> how fast the whole job can possibly finish, however many machines join.
+> That is what HEFT-style placement optimises. Barriers between stages are
+> where stragglers hurt: [primer §5](PRIMER.md).
+
 **Status: built.** All four steps are implemented and tested. What has *not*
 been done is running any of it against a live cluster — see
 [What is not verified](#what-is-not-verified).
