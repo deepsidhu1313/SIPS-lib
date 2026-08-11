@@ -6,16 +6,28 @@
 Phones as SIPS nodes: what they are good for, what they are not, and what a
 worker on each platform actually has to implement.
 
-**Status: everything short of the app is built and tested.** The transport
+**Status: the cluster side is built and tested; iOS has a real, tested
+library and a partially-working app; Android is unbuilt.** The transport
 (`OutboundWorker`), the judgment (`WorkerEligibility` + `WorkerRoster`,
-fail-closed), the measurement (`WorkerBench`), the task format (`ExprTask` —
-expression plus data, one self-contained frame), speculative re-issue, robust
-averaging, and **two** conformance suites: the WASM ABI vectors and
-`expr-conformance.json` for the fifteen-op evaluator. The `MobileFleet`
-sample runs the entire session over real sockets — join, announce, refuse
-the unfit, shard by measured speed, re-issue past deadline, stitch
-bit-identical results. An Android or iOS app that closes the last loop is
-not written; the checklist below is what it takes.
+fail-closed, now including a discrete thermal-level path for platforms
+without a Celsius API), the measurement (`WorkerBench`), the task format
+(`ExprTask` — expression plus data, one self-contained frame), speculative
+re-issue, robust averaging, and **two** conformance suites: the WASM ABI
+vectors and `expr-conformance.json` for the fifteen-op evaluator. The
+`MobileFleet` sample runs the entire session over real sockets — join,
+announce, refuse the unfit, shard by measured speed, re-issue past deadline,
+stitch bit-identical results.
+
+[SIPS-iOS-Worker](https://github.com/deepsidhu1313/SIPS-iOS-Worker) is a real
+Swift port, verified against this repository directly: 22 tests green
+including the real conformance suite, and a live cross-language round trip
+against a genuine `WorkerConnections` process (`MATCH true`). Its installable
+app runs in the iOS Simulator and reads real device signals, but two
+packaging-related issues — not evaluator or protocol bugs — remain open; see
+*Findings feeding back into this repository* below and that project's
+`docs/FINDINGS.md` for the full, detailed account, including what was tried
+and what a live deadlock found by testing looked like before it was fixed.
+Android is unbuilt; the reasoning below is analysis, not a verified result.
 
 ## Why phones at all
 
@@ -199,16 +211,67 @@ on ART — an Android worker reuses `WasmRunner` and `WasmHost` as they are. The
 work is the app: a foreground service, the dial-out connection, and battery and
 thermal reporting through `BatteryManager` and `HardwarePropertiesManager`.
 
-**iOS** has no JVM, so the worker is Swift around a Swift WebAssembly runtime
-(WasmKit) implementing the same six imports by hand. That is the afternoon's
-work; the conformance vectors are what turn "I implemented it" into "I
-implemented it correctly". Everything else carries over unchanged — the frame
-format, the manifest, the chunk spec, and the tensor layout, which is
-little-endian IEEE-754 precisely because that is what WASM linear memory is.
+**iOS is built**, at
+[SIPS-iOS-Worker](https://github.com/deepsidhu1313/SIPS-iOS-Worker) — not the
+WASM path originally sketched here, but the expression path: a Swift
+`ArrayCompute` implementing all fifteen `Expr` ops, verified against the real
+Java evaluator via `expr-conformance.json` and, separately, against a live
+`WorkerConnections` process over a real socket (`MATCH true`). `MATMUL` routes
+to Apple's own `cblas_sgemm` — no kernel-tuning work needed, unlike the OpenCL
+path — and doing so surfaced a real, useful finding, corrected in this
+repository's own `ExprConformanceTest`: see *Findings feeding back into this
+repository* below.
 
-Two things to decide before starting iOS: whether it is a reference
-implementation or a shipping app (the App Store has views about background
-compute), and whether the Swift worker lives in this repository or its own.
+The WASM path (a Swift runtime implementing the six host imports by hand,
+originally estimated at "an afternoon's work") remains unbuilt and the
+estimate untested. The expression path turned out to need no WASM runtime at
+all, which is why it was built first — it directly serves the two workloads
+phones are actually good for (batch inference, a `planReduce` partial), and
+"no runtime to embed" is a smaller surface for exactly the packaging issues
+`SIPS-iOS-Worker/docs/FINDINGS.md` documents in detail.
+
+Building it also surfaced a real answer to the question this document used to
+leave open — whether iOS is a reference implementation or a shipping app: it
+does not have to be decided up front. The library (`SIPSWorker`, tested via
+plain `swift build`/`swift test`, no Xcode-GUI dependency) is useful as a
+reference/interop target on its own, independent of whether the app half ever
+ships; that separation turned out to matter for a concrete tooling reason
+(`AppleProductTypes` is unavailable to the open-source CLI toolchain) as well
+as the product one.
+
+## Findings feeding back into this repository
+
+Two things built for iOS changed code here, not just documentation:
+
+- **`WorkerEligibility.ThermalLevel`** — iOS has no Celsius API at all, only
+  `ProcessInfo.thermalState`'s four-level enum. `Reading`/`Policy` gained a
+  parallel discrete-level path (`onBatteryWithThermalLevel`,
+  `mainsWithThermalLevel`, `Policy.maxThermalLevel`), and `WorkerRoster` parses
+  an optional `THERMAL_STATE` announcement field alongside `TEMPERATURE_C`.
+- **A conformance-vector overclaim, corrected.** `expr-conformance.json`'s
+  `matmul-exact` and `gram-partial` vectors declared zero tolerance, reasoning
+  that a defined summation order guarantees a defined result. Porting `MATMUL`
+  to Accelerate's `cblas_sgemm` — the obviously correct choice on that
+  platform — measured a real ~1-ULP gap, because a vendor BLAS's internal
+  accumulation grouping is not documented to match a sequential accumulate.
+  Both vectors now declare a small measured tolerance instead, and the file's
+  general claim about zero tolerance is narrowed to what is actually true.
+  Full detail: `SIPS-iOS-Worker/docs/FINDINGS.md`.
+
+Two more are genuine open findings, not yet resolved: a hand-assembled `.app`
+bundle built from this package renders correctly and reads real device
+signals, but does not reliably receive touch input, and a TCP connection from
+inside that bundle does not reliably deliver its hello frame to a live master
+even though the socket itself reports connected. Both are recorded in detail,
+including what was tried, in `SIPS-iOS-Worker/docs/FINDINGS.md` — the
+project's `DialCheck` executable proves the actual worker code is correct
+independent of this packaging gap.
+
+**Android remains unbuilt.** The reasoning below (Chicory reuse, foreground
+service, `BatteryManager`/`HardwarePropertiesManager`) is analysis, not a
+verified result, in the same sense the WASM path above now is — noted so a
+reader does not mistake "written down" for "measured," the distinction this
+whole document now tries to keep visible throughout.
 
 ## What is deliberately absent
 

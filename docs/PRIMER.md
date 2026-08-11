@@ -174,6 +174,8 @@ unexamined one:
 | Phones can join hot paths | 122 ms p99, struck ~21×/token | phones do batch rounds, never per-layer work |
 | GEMM-chain residency win shrinks with n (our own javadoc) | holds at ~1.9–2.1× from 256³ to 1024³ | per-call blocking reads stall the pipeline — the cost model missed synchronisation, not bytes |
 | A uniform "garbage" model poisons a mean | softmax is shift-invariant; the attack was a no-op | attack demonstrations must be asymmetric to demonstrate anything |
+| A defined summation order guarantees a defined result (our own vector file) | vendor BLAS gap up to 1 ULP, isolated cleanly to matmul-routed cases | order ≠ result once an external library's accumulation grouping is involved; conformance vectors corrected |
+| iOS suspends a backgrounded process quickly (assumed, then tested where it could be) | the Simulator does not enforce suspension at all — `ps` showed the process still scheduled, unchanged, after backgrounding | Simulator validates the `scenePhase` notification path only; the execution-budget claim itself needs a physical device |
 
 ## Where to go next
 
