@@ -117,10 +117,78 @@ class WorkerEligibilityTest {
         // For a long training run: a phone that is charging will still be
         // there in an hour, and one on battery probably will not.
         WorkerEligibility.Policy plugged =
-                new WorkerEligibility.Policy(30, 45.0, true, false);
+                new WorkerEligibility.Policy(30, 45.0, true, false, WorkerEligibility.ThermalLevel.FAIR);
 
         assertFalse(WorkerEligibility.of(WorkerEligibility.Reading.onBattery(95, 25.0), plugged).fit());
         assertTrue(WorkerEligibility.of(WorkerEligibility.Reading.mains(25.0), plugged).fit());
+    }
+
+    @Test
+    void iosHasNoCelsiusOnlyAFourLevelThermalState() {
+        // iOS deliberately does not expose a raw temperature to apps -- only
+        // ProcessInfo.thermalState, a coarse .nominal/.fair/.serious/.critical
+        // enum. Fabricating a Celsius number to fit the existing shape would
+        // misrepresent what the device actually reported, so this is a
+        // genuinely separate reading shape, not a unit conversion.
+        WorkerEligibility.Reading cool = WorkerEligibility.Reading
+                .onBatteryWithThermalLevel(80, WorkerEligibility.ThermalLevel.NOMINAL);
+
+        assertTrue(WorkerEligibility.of(cool, DEFAULTS).fit());
+    }
+
+    @Test
+    void aSeriousOrWorseThermalStateIsRefused() {
+        WorkerEligibility.Report serious = WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.SERIOUS), DEFAULTS);
+        WorkerEligibility.Report critical = WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.CRITICAL), DEFAULTS);
+
+        assertFalse(serious.fit());
+        assertTrue(serious.refusal().orElseThrow().toLowerCase().contains("thermal"),
+                serious.refusal().orElseThrow());
+        assertFalse(critical.fit());
+    }
+
+    @Test
+    void nominalAndFairThermalStatesAreFit() {
+        assertTrue(WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.NOMINAL), DEFAULTS).fit());
+        assertTrue(WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.FAIR), DEFAULTS).fit());
+    }
+
+    @Test
+    void aPolicyCanSetItsOwnThermalCeiling() {
+        // A short, light job might tolerate SERIOUS; a long training round
+        // should not even risk it. This is a policy choice, like the battery
+        // floor and the mains requirement beside it.
+        WorkerEligibility.Policy tolerant = new WorkerEligibility.Policy(
+                30, 45.0, false, true, WorkerEligibility.ThermalLevel.SERIOUS);
+
+        assertTrue(WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.SERIOUS), tolerant).fit());
+        assertFalse(WorkerEligibility.of(WorkerEligibility.Reading
+                .mainsWithThermalLevel(WorkerEligibility.ThermalLevel.CRITICAL), tolerant).fit());
+    }
+
+    @Test
+    void celsiusTakesPriorityWhenSomehowBothArePresent() {
+        // Should not happen from any one platform's real announcement, but
+        // the precedence needs to be defined rather than accidental: a
+        // reading built from a Celsius factory has no thermalLevel to
+        // conflict with it, so this pins that the Celsius path is untouched
+        // by the new one rather than testing an actually-reachable ambiguity.
+        assertFalse(WorkerEligibility.of(WorkerEligibility.Reading.mains(52.0), DEFAULTS).fit());
+    }
+
+    @Test
+    void anAbsentThermalLevelIsAcceptedJustLikeAbsentCelsius() {
+        // Same asymmetry as temperature: most platforms report neither
+        // Celsius nor a discrete level, and refusing all of them would make
+        // the check useless where it is needed least. unknownTemperature()
+        // already covers this shape; this test names the new field
+        // explicitly so the coverage is not accidental.
+        assertTrue(WorkerEligibility.of(WorkerEligibility.Reading.unknownTemperature(), DEFAULTS).fit());
     }
 
     @Test
@@ -163,7 +231,8 @@ class WorkerEligibilityTest {
     void aPolicyCanAllowWorkWhileInUse() {
         // Some jobs are light enough that running alongside the owner is
         // fine; the check is a policy choice, not a hard law.
-        WorkerEligibility.Policy tolerant = new WorkerEligibility.Policy(30, 45.0, false, false);
+        WorkerEligibility.Policy tolerant = new WorkerEligibility.Policy(
+                30, 45.0, false, false, WorkerEligibility.ThermalLevel.FAIR);
 
         assertTrue(WorkerEligibility.of(
                 WorkerEligibility.Reading.mains(25.0).activelyInUse(), tolerant).fit());

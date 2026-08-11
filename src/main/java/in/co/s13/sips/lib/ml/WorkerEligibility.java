@@ -66,62 +66,103 @@ import java.util.OptionalInt;
  * foreground state — can report active use at all, so treating silence as
  * refusal here would refuse nearly the whole fleet and defeat the point of
  * asking it for help.
+ *
+ * <h2>Temperature without Celsius</h2>
+ *
+ * <p>iOS deliberately does not expose a raw temperature to apps at all — only
+ * {@code ProcessInfo.thermalState}, a coarse four-level enum mirrored here as
+ * {@link ThermalLevel}. Fabricating a Celsius number to fit the numeric
+ * ceiling below would misrepresent what the device actually reported, so this
+ * is a genuinely separate reading shape rather than a unit conversion: a
+ * platform reports Celsius, or a discrete level, or neither — never both, and
+ * the {@link #of} judgment checks Celsius first only because a reading built
+ * from one shape's factory never populates the other.
  */
 public final class WorkerEligibility {
 
+    /**
+     * The four levels {@code ProcessInfo.ThermalState} reports on iOS, in
+     * ascending severity — the ordering itself is load-bearing, since a
+     * policy ceiling is judged by {@link Enum#compareTo}.
+     */
+    public enum ThermalLevel {
+        NOMINAL, FAIR, SERIOUS, CRITICAL
+    }
+
     /** What a device says about itself. */
     public record Reading(boolean onMains, OptionalInt batteryPercent,
-            OptionalDouble temperatureCelsius, Optional<Boolean> inUse) {
+            OptionalDouble temperatureCelsius, Optional<ThermalLevel> thermalLevel,
+            Optional<Boolean> inUse) {
 
         /** A machine on mains power, with a temperature. */
         public static Reading mains(double temperatureCelsius) {
             return new Reading(true, OptionalInt.empty(),
-                    OptionalDouble.of(temperatureCelsius), Optional.empty());
+                    OptionalDouble.of(temperatureCelsius), Optional.empty(), Optional.empty());
         }
 
         /** A device running on its battery. */
         public static Reading onBattery(int percent, double temperatureCelsius) {
             return new Reading(false, OptionalInt.of(percent),
-                    OptionalDouble.of(temperatureCelsius), Optional.empty());
+                    OptionalDouble.of(temperatureCelsius), Optional.empty(), Optional.empty());
         }
 
         /** A device on battery that could not say how much is left. */
         public static Reading unknownBattery(double temperatureCelsius) {
             return new Reading(false, OptionalInt.empty(),
-                    OptionalDouble.of(temperatureCelsius), Optional.empty());
+                    OptionalDouble.of(temperatureCelsius), Optional.empty(), Optional.empty());
         }
 
         /** A machine with no thermal sensor, which is most of them. */
         public static Reading unknownTemperature() {
             return new Reading(true, OptionalInt.empty(), OptionalDouble.empty(),
-                    Optional.empty());
+                    Optional.empty(), Optional.empty());
+        }
+
+        /** A device on battery reporting only a discrete thermal level — iOS. */
+        public static Reading onBatteryWithThermalLevel(int percent, ThermalLevel level) {
+            if (level == null) {
+                throw new IllegalArgumentException("A thermal level is required");
+            }
+            return new Reading(false, OptionalInt.of(percent), OptionalDouble.empty(),
+                    Optional.of(level), Optional.empty());
+        }
+
+        /** A device on mains reporting only a discrete thermal level — iOS. */
+        public static Reading mainsWithThermalLevel(ThermalLevel level) {
+            if (level == null) {
+                throw new IllegalArgumentException("A thermal level is required");
+            }
+            return new Reading(true, OptionalInt.empty(), OptionalDouble.empty(),
+                    Optional.of(level), Optional.empty());
         }
 
         /** The same reading, with its owner confirmed to be using it right now. */
         public Reading activelyInUse() {
-            return new Reading(onMains, batteryPercent, temperatureCelsius,
+            return new Reading(onMains, batteryPercent, temperatureCelsius, thermalLevel,
                     Optional.of(true));
         }
 
         /** The same reading, with the device confirmed idle. */
         public Reading confirmedIdle() {
-            return new Reading(onMains, batteryPercent, temperatureCelsius,
+            return new Reading(onMains, batteryPercent, temperatureCelsius, thermalLevel,
                     Optional.of(false));
         }
     }
 
     /** What a job is willing to ask of a device. */
     public record Policy(int minBatteryPercent, double maxTemperatureCelsius,
-            boolean requireMains, boolean avoidWhenInUse) {
+            boolean requireMains, boolean avoidWhenInUse, ThermalLevel maxThermalLevel) {
 
         /**
          * Enough headroom that a round does not strand someone at zero, a
          * ceiling below the point at which handsets throttle, battery power
-         * allowed — most volunteers are not plugged in — and a device its
-         * owner is actively using is left alone by default.
+         * allowed — most volunteers are not plugged in — a device its owner
+         * is actively using left alone, and the same throttle-avoidance
+         * reasoning as the Celsius ceiling expressed in iOS's own vocabulary:
+         * a device already at FAIR is not yet mitigating, one at SERIOUS is.
          */
         public static Policy defaults() {
-            return new Policy(30, 45.0, false, true);
+            return new Policy(30, 45.0, false, true, ThermalLevel.FAIR);
         }
     }
 
@@ -151,6 +192,15 @@ public final class WorkerEligibility {
             return Report.no("temperature is "
                     + reading.temperatureCelsius().getAsDouble() + " C, above the "
                     + policy.maxTemperatureCelsius() + " C ceiling");
+        }
+        // The discrete path, checked only when Celsius was not reported: a
+        // reading is built from one shape's factory and never carries both,
+        // but Celsius wins on principle if it somehow did -- a real number is
+        // more informative than a four-level bucket.
+        if (reading.temperatureCelsius().isEmpty() && reading.thermalLevel().isPresent()
+                && reading.thermalLevel().get().compareTo(policy.maxThermalLevel()) > 0) {
+            return Report.no("thermal state is " + reading.thermalLevel().get()
+                    + ", above the " + policy.maxThermalLevel() + " ceiling");
         }
 
         // Checked before the mains short-circuit below: a plugged-in phone
