@@ -7,7 +7,7 @@ Phones as SIPS nodes: what they are good for, what they are not, and what a
 worker on each platform actually has to implement.
 
 **Status: the cluster side is built and tested; iOS has a real, tested
-library and a partially-working app; Android is unbuilt.** The transport
+library and a verified end-to-end app; Android is unbuilt.** The transport
 (`OutboundWorker`), the judgment (`WorkerEligibility` + `WorkerRoster`,
 fail-closed, now including a discrete thermal-level path for platforms
 without a Celsius API), the measurement (`WorkerBench`), the task format
@@ -21,12 +21,13 @@ stitch bit-identical results.
 [SIPS-iOS-Worker](https://github.com/deepsidhu1313/SIPS-iOS-Worker) is a real
 Swift port, verified against this repository directly: 22 tests green
 including the real conformance suite, and a live cross-language round trip
-against a genuine `WorkerConnections` process (`MATCH true`). Its installable
-app runs in the iOS Simulator and reads real device signals, but two
-packaging-related issues — not evaluator or protocol bugs — remain open; see
-*Findings feeding back into this repository* below and that project's
-`docs/FINDINGS.md` for the full, detailed account, including what was tried
-and what a live deadlock found by testing looked like before it was fixed.
+against a genuine `WorkerConnections` process (`MATCH true`) — now run all the
+way through the real installed app, not just the standalone `DialCheck`
+executable. See *Findings feeding back into this repository* below and that
+project's `docs/FINDINGS.md` for the full, detailed account, including what a
+live deadlock found by testing looked like before it was fixed, and how two
+initially-unresolved packaging findings turned out to be a test-harness bug
+and an environment limitation rather than app defects.
 Android is unbuilt; the reasoning below is analysis, not a verified result.
 
 ## Why phones at all
@@ -258,14 +259,19 @@ Two things built for iOS changed code here, not just documentation:
   general claim about zero tolerance is narrowed to what is actually true.
   Full detail: `SIPS-iOS-Worker/docs/FINDINGS.md`.
 
-Two more are genuine open findings, not yet resolved: a hand-assembled `.app`
-bundle built from this package renders correctly and reads real device
-signals, but does not reliably receive touch input, and a TCP connection from
-inside that bundle does not reliably deliver its hello frame to a live master
-even though the socket itself reports connected. Both are recorded in detail,
-including what was tried, in `SIPS-iOS-Worker/docs/FINDINGS.md` — the
-project's `DialCheck` executable proves the actual worker code is correct
-independent of this packaging gap.
+Two more were initially recorded as open findings and have since been
+resolved, with the correction kept alongside the original mistake rather than
+silently erased: the apparent "touch input doesn't reach the app" bug turned
+out to reproduce on Apple's own stock Settings app too, isolating it to the
+test session's simulator-automation touch-injection path rather than this
+project's packaging; and the apparent "hello frame doesn't reach the master"
+bug turned out to be a test script awaiting the wrong worker id
+(`DialCheck`'s hardcoded id instead of the real app's device-derived one) —
+the TCP connection and hello frame were correct the entire time. Both
+corrections, including the counter-intuitive discovery that passing
+`--entitlements` explicitly to `codesign` *breaks* launch (the working
+invocation omits it), are recorded in detail in
+`SIPS-iOS-Worker/docs/FINDINGS.md`.
 
 **Android remains unbuilt.** The reasoning below (Chicory reuse, foreground
 service, `BatteryManager`/`HardwarePropertiesManager`) is analysis, not a
