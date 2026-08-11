@@ -166,8 +166,15 @@ public final class WasmRunner implements AutoCloseable {
     /** The content address a parsed module is kept under. */
     private static String address(byte[] bytes) {
         try {
-            return java.util.HexFormat.of().formatHex(
-                    java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+            // A plain loop rather than the Java 17 hex formatter, absent on
+            // ART -- this class runs on Android workers.
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(Character.forDigit((value >> 4) & 0xf, 16))
+                        .append(Character.forDigit(value & 0xf, 16));
+            }
+            return hex.toString();
         } catch (java.security.NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is required of every JVM", impossible);
         }

@@ -170,8 +170,10 @@ public final class WarmModels {
                 // Nothing useful to do and nothing worth failing for: the
                 // model is already out of the map, so it will not be handed to
                 // anyone again whether or not it let go of its resources.
-                System.getLogger(WarmModels.class.getName())
-                        .log(System.Logger.Level.WARNING,
+                // java.util.logging rather than the Java 9 platform logger,
+                // which ART does not have -- this class runs on Android workers.
+                java.util.logging.Logger.getLogger(WarmModels.class.getName())
+                        .log(java.util.logging.Level.WARNING,
                                 "A warm model refused to close", refused);
             }
         }

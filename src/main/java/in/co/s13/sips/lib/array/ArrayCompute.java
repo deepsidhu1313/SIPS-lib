@@ -140,7 +140,12 @@ public final class ArrayCompute {
                     yield (r, c) -> left.at(r, c) + row.at(0, c);
                 }
                 case RELU -> (r, c) -> Math.max(0f, left.at(r, c));
-                case EXP -> (r, c) -> (float) Math.exp(left.at(r, c));
+                // StrictMath, not Math: Math.exp may differ between JVMs and
+                // platforms, and a phone worker must produce the same floats a
+                // laptop did. StrictMath pins the fdlibm algorithm. Ports to
+                // other languages get a declared tolerance in the conformance
+                // vectors instead, because their libm is not fdlibm.
+                case EXP -> (r, c) -> (float) StrictMath.exp(left.at(r, c));
                 case SCALE -> {
                     float by = node.scalar();
                     yield (r, c) -> left.at(r, c) * by;

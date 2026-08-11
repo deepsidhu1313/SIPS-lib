@@ -6,10 +6,16 @@
 Phones as SIPS nodes: what they are good for, what they are not, and what a
 worker on each platform actually has to implement.
 
-**Status: the cluster-side pieces are built and tested; no mobile worker
-exists.** `OutboundWorker`, `WorkerEligibility`, `SpeculativeRound`,
-`RobustAverage` and the ABI conformance vectors are all in the library and
-green. An Android or iOS app that uses them is not written.
+**Status: everything short of the app is built and tested.** The transport
+(`OutboundWorker`), the judgment (`WorkerEligibility` + `WorkerRoster`,
+fail-closed), the measurement (`WorkerBench`), the task format (`ExprTask` —
+expression plus data, one self-contained frame), speculative re-issue, robust
+averaging, and **two** conformance suites: the WASM ABI vectors and
+`expr-conformance.json` for the fifteen-op evaluator. The `MobileFleet`
+sample runs the entire session over real sockets — join, announce, refuse
+the unfit, shard by measured speed, re-issue past deadline, stitch
+bit-identical results. An Android or iOS app that closes the last loop is
+not written; the checklist below is what it takes.
 
 ## Why phones at all
 
@@ -106,6 +112,38 @@ The ABI is six imports in namespace `sips`:
 The module exports `run(i64 firstIndex, i64 lastIndexExclusive) -> i64 status`
 and one page of `memory`. The capability list *is* the security model: a module
 can do exactly these six things and nothing else.
+
+## The two task formats, and which port is easier
+
+A worker needs to run *something*. There are now two portable somethings:
+
+1. **WASM modules** — arbitrary compiled code, sandboxed by the six-import
+   ABI. Android gets this free (Chicory on ART); iOS needs a WASM runtime
+   (WasmKit) plus the six imports.
+2. **Serialised expressions** (`ExprTask`) — the fifteen array ops with data
+   attached. No runtime to embed at all: an evaluator is a few hundred lines
+   in any language, and `expr-conformance.json` proves a port produces the
+   same bytes (exact except transcendentals, where the vectors declare
+   tolerance because Swift's libm is not fdlibm — the Java side pins
+   StrictMath for exactly this reason).
+
+For iOS, the expression path is the recommended start: afternoon-sized,
+conformance-provable, and it already covers the batch inference and partial-
+reduction workloads phones are good for. WASM support can follow.
+
+## The worker checklist (either platform)
+
+1. Dial the master, speak `WorkerFrames` (length-prefixed JSON + payload).
+2. Send `hello` with the announcement schema: `MAINS`, `BATTERY`,
+   `TEMPERATURE_C`, and `BENCH_MS` — the timings of `WorkerBench.standard()`,
+   warm-up first. Claims are judged fail-closed and hostile timings are
+   discounted, so there is no incentive to lie and no harm in honesty.
+3. On a `work` frame: decode the `ExprTask`, validate (the document is input
+   from the network even on the phone), evaluate, reply `result` with
+   little-endian float bytes; on failure reply `failed` with a reason rather
+   than going silent — silence holds the round open until the deadline.
+4. Re-announce when circumstances change (unplugged, hot); stop accepting
+   work below the floors *before* the master would refuse you.
 
 ## Per platform
 
