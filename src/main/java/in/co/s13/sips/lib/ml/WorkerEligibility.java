@@ -49,48 +49,79 @@ import java.util.OptionalInt;
  * <p>Temperature is deliberately the other way round. Plenty of ordinary
  * servers expose no thermal sensor at all, and refusing every one of them would
  * make the check useless exactly where it is needed least.
+ *
+ * <h2>Active use</h2>
+ *
+ * <p>JPPF's "Idle Host" mode restricts a node to only accepting work while its
+ * host is otherwise idle — a screensaver-triggered check, applied to any
+ * machine, not only phones. The reasoning generalises: stealing cycles from
+ * someone actively at the keyboard is rude whichever way the device is
+ * powered, and the social cost of draining a stranger's battery is worse when
+ * they are mid-conversation than when the phone is face-down on a charger
+ * overnight. {@link Reading#activelyInUse()} carries that signal.
+ *
+ * <p>Unlike battery, this is treated leniently when absent. Every device can
+ * cheaply report its battery, so silence there is itself suspicious; hardly
+ * any platform — a desktop, an older phone, anything not wired up to report
+ * foreground state — can report active use at all, so treating silence as
+ * refusal here would refuse nearly the whole fleet and defeat the point of
+ * asking it for help.
  */
 public final class WorkerEligibility {
 
     /** What a device says about itself. */
     public record Reading(boolean onMains, OptionalInt batteryPercent,
-            OptionalDouble temperatureCelsius) {
+            OptionalDouble temperatureCelsius, Optional<Boolean> inUse) {
 
         /** A machine on mains power, with a temperature. */
         public static Reading mains(double temperatureCelsius) {
             return new Reading(true, OptionalInt.empty(),
-                    OptionalDouble.of(temperatureCelsius));
+                    OptionalDouble.of(temperatureCelsius), Optional.empty());
         }
 
         /** A device running on its battery. */
         public static Reading onBattery(int percent, double temperatureCelsius) {
             return new Reading(false, OptionalInt.of(percent),
-                    OptionalDouble.of(temperatureCelsius));
+                    OptionalDouble.of(temperatureCelsius), Optional.empty());
         }
 
         /** A device on battery that could not say how much is left. */
         public static Reading unknownBattery(double temperatureCelsius) {
             return new Reading(false, OptionalInt.empty(),
-                    OptionalDouble.of(temperatureCelsius));
+                    OptionalDouble.of(temperatureCelsius), Optional.empty());
         }
 
         /** A machine with no thermal sensor, which is most of them. */
         public static Reading unknownTemperature() {
-            return new Reading(true, OptionalInt.empty(), OptionalDouble.empty());
+            return new Reading(true, OptionalInt.empty(), OptionalDouble.empty(),
+                    Optional.empty());
+        }
+
+        /** The same reading, with its owner confirmed to be using it right now. */
+        public Reading activelyInUse() {
+            return new Reading(onMains, batteryPercent, temperatureCelsius,
+                    Optional.of(true));
+        }
+
+        /** The same reading, with the device confirmed idle. */
+        public Reading confirmedIdle() {
+            return new Reading(onMains, batteryPercent, temperatureCelsius,
+                    Optional.of(false));
         }
     }
 
     /** What a job is willing to ask of a device. */
     public record Policy(int minBatteryPercent, double maxTemperatureCelsius,
-            boolean requireMains) {
+            boolean requireMains, boolean avoidWhenInUse) {
 
         /**
          * Enough headroom that a round does not strand someone at zero, a
-         * ceiling below the point at which handsets throttle, and battery
-         * power allowed — most volunteers are not plugged in.
+         * ceiling below the point at which handsets throttle, battery power
+         * allowed — most volunteers are not plugged in — and a device its
+         * owner is actively using is left alone by default.
          */
         public static Policy defaults() {
-            return new Policy(30, 45.0, false);
+            return new Policy(30, 45.0, false, true);
         }
     }
 
@@ -120,6 +151,14 @@ public final class WorkerEligibility {
             return Report.no("temperature is "
                     + reading.temperatureCelsius().getAsDouble() + " C, above the "
                     + policy.maxTemperatureCelsius() + " C ceiling");
+        }
+
+        // Checked before the mains short-circuit below: a plugged-in phone
+        // its owner is actively using is still rude to burden, so being on
+        // mains must not exempt a device from this check.
+        if (policy.avoidWhenInUse() && reading.inUse().orElse(false)) {
+            return Report.no("the device is in active use, and this job leaves "
+                    + "in-use devices alone");
         }
 
         if (reading.onMains()) {

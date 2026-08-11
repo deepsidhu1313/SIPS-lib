@@ -116,10 +116,66 @@ class WorkerEligibilityTest {
     void aPolicyCanDemandMainsPower() {
         // For a long training run: a phone that is charging will still be
         // there in an hour, and one on battery probably will not.
-        WorkerEligibility.Policy plugged = new WorkerEligibility.Policy(30, 45.0, true);
+        WorkerEligibility.Policy plugged =
+                new WorkerEligibility.Policy(30, 45.0, true, false);
 
         assertFalse(WorkerEligibility.of(WorkerEligibility.Reading.onBattery(95, 25.0), plugged).fit());
         assertTrue(WorkerEligibility.of(WorkerEligibility.Reading.mains(25.0), plugged).fit());
+    }
+
+    @Test
+    void aDeviceActivelyInUseIsRefusedUnderTheDefaultPolicy() {
+        // JPPF's "Idle Host" mode does this for any node, not only phones:
+        // stealing cycles from someone actively at the keyboard is rude
+        // whichever way the device is powered, so this is checked regardless
+        // of mains vs battery.
+        WorkerEligibility.Report report = WorkerEligibility.of(
+                WorkerEligibility.Reading.mains(25.0).activelyInUse(), DEFAULTS);
+
+        assertFalse(report.fit());
+        assertTrue(report.refusal().orElseThrow().contains("use"),
+                report.refusal().orElseThrow());
+    }
+
+    @Test
+    void aDeviceConfirmedIdleIsFit() {
+        WorkerEligibility.Report report = WorkerEligibility.of(
+                WorkerEligibility.Reading.onBattery(80, 25.0).confirmedIdle(), DEFAULTS);
+
+        assertTrue(report.fit());
+    }
+
+    @Test
+    void unknownActiveUseDoesNotRefuse() {
+        // Unlike battery, most platforms -- desktops, older phones, this
+        // library's own existing Reading factories -- have never reported
+        // this signal at all. Treating "did not say" as "refuse" here would
+        // refuse nearly everyone and defeat the point: unlike battery, there
+        // is no cheap universal way for a device to know, so silence is not
+        // suspicious the way a missing battery reading is.
+        assertTrue(WorkerEligibility.of(
+                WorkerEligibility.Reading.onBattery(80, 25.0), DEFAULTS).fit());
+        assertTrue(WorkerEligibility.of(
+                WorkerEligibility.Reading.mains(25.0), DEFAULTS).fit());
+    }
+
+    @Test
+    void aPolicyCanAllowWorkWhileInUse() {
+        // Some jobs are light enough that running alongside the owner is
+        // fine; the check is a policy choice, not a hard law.
+        WorkerEligibility.Policy tolerant = new WorkerEligibility.Policy(30, 45.0, false, false);
+
+        assertTrue(WorkerEligibility.of(
+                WorkerEligibility.Reading.mains(25.0).activelyInUse(), tolerant).fit());
+    }
+
+    @Test
+    void activeUseIsCheckedEvenOnMains() {
+        // The mains check already short-circuits straight to fit(); this
+        // pins that active-use is judged before that short-circuit fires,
+        // not skipped by it.
+        assertFalse(WorkerEligibility.of(
+                WorkerEligibility.Reading.mains(25.0).activelyInUse(), DEFAULTS).fit());
     }
 
     @Test

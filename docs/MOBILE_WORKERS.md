@@ -77,15 +77,24 @@ The frame format is in `WorkerFrames`: length-prefixed JSON header, then a
 length-prefixed payload. Four frame types — `hello`, `work`, `result`, `failed`.
 That is the whole protocol, and it is `OUTBOUND_WORKERS`, protocol version 4.
 
+The connection does not have to be forever. `OutboundWorker.idleTimeout` lets it
+go once nothing has arrived for a while, and redials next time there is work —
+see *What JPPF does, and what we took from it* below for why.
+
 ### 2. Announce fitness honestly
 
 The phone is the only party that knows its battery, its temperature and whether
 it is charging; it sends them in the `hello` frame and the master applies
-`WorkerEligibility`. The rule that matters: **an unreadable battery counts as
-unfit.** A device that cannot say how it is doing is exactly the one whose
-battery should not be assumed healthy — and on Android a broken reading is a
-real observed condition, not a hypothetical, with `-1` reported instead of a
-failure.
+`WorkerEligibility` through `WorkerRoster`. The rule that matters: **an
+unreadable battery counts as unfit.** A device that cannot say how it is doing
+is exactly the one whose battery should not be assumed healthy — and on Android
+a broken reading is a real observed condition, not a hypothetical, with `-1`
+reported instead of a failure.
+
+A device can also announce `IN_USE` — whether its owner is holding it right
+now. The default policy refuses a worker actively in use, mains or battery,
+but treats the field's *absence* leniently: almost no platform can report it
+at all, so unlike battery, silence here is not held against a worker.
 
 ### 3. Run the module (the ABI)
 
@@ -135,15 +144,53 @@ reduction workloads phones are good for. WASM support can follow.
 
 1. Dial the master, speak `WorkerFrames` (length-prefixed JSON + payload).
 2. Send `hello` with the announcement schema: `MAINS`, `BATTERY`,
-   `TEMPERATURE_C`, and `BENCH_MS` — the timings of `WorkerBench.standard()`,
-   warm-up first. Claims are judged fail-closed and hostile timings are
-   discounted, so there is no incentive to lie and no harm in honesty.
+   `TEMPERATURE_C`, `BENCH_MS` — the timings of `WorkerBench.standard()`,
+   warm-up first — and optionally `IN_USE`. Claims are judged fail-closed and
+   hostile timings are discounted, so there is no incentive to lie and no harm
+   in honesty.
 3. On a `work` frame: decode the `ExprTask`, validate (the document is input
    from the network even on the phone), evaluate, reply `result` with
    little-endian float bytes; on failure reply `failed` with a reason rather
    than going silent — silence holds the round open until the deadline.
-4. Re-announce when circumstances change (unplugged, hot); stop accepting
-   work below the floors *before* the master would refuse you.
+4. Re-announce when circumstances change (unplugged, hot, picked up); stop
+   accepting work below the floors *before* the master would refuse you.
+5. If configured with an idle timeout, expect the connection to close itself
+   after a quiet stretch, and redial when there is something to contribute
+   again — this is normal, not an error.
+
+## What JPPF does, and what we took from it
+
+[JPPF](https://github.com/jppf-grid/JPPF) is a mature Java grid framework with
+a real, working Android node — verified against its actual repository and
+documentation, not assumed. Two of its choices are worth comparing against.
+
+**Tasks travel as dynamically-loaded DEX bytecode.** JPPF's sample build step
+(`ant dex.jar`) cross-converts a compiled Java jar to Android's DEX format; the
+node downloads and dynamically loads it to run arbitrary task code on-device.
+We do not do this, on purpose. `ExprTask` is pure data — an expression plus
+matrices, fed to an already-installed evaluator — and WASM modules run inside
+a sandboxed interpreter. Nothing SIPS ships is "installed" differently before
+or after a task arrives, which sidesteps exactly the pattern Android's
+security hardening (W^X enforcement, Play Integrity attestation) and Play
+Store policy have spent years working against.
+
+**JPPF's Android node disconnects before every task**, reconnecting only to
+submit results and fetch the next one — stated explicitly for battery, since a
+background socket is what Doze and App Standby throttle or kill. That
+reasoning is sound and worth taking; the mechanism is not, for us:
+reconnecting per task reintroduces the radio wake-up and handshake §1 exists
+to avoid, and a SIPS shard is seconds to minutes of work, not a JPPF-sized
+microtask. `idleTimeout` is the synthesis — the connection survives a steady
+stream of chunks and only lets go once genuinely idle, which is the situation
+JPPF's design is actually protecting against.
+
+**JPPF's separate "Idle Host" mode** — a node that only accepts work while its
+host is otherwise idle, screensaver-style — has no equivalent built before
+this document's previous revision. It is now `IN_USE` in the announcement
+schema and `WorkerEligibility.Policy.avoidWhenInUse` (on by default): draining
+a stranger's battery while they are mid-conversation with their phone is a
+worse cost than doing it slowly while it charges overnight, whichever way the
+device is powered.
 
 ## Per platform
 
