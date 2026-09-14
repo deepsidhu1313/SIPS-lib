@@ -105,17 +105,25 @@ consequences, all built and measured:
 ## 6. Three ways to split a model, and the two that don't survive Ethernet
 
 - **Data parallel**: every worker holds the whole model, inputs are split.
-  Nothing crosses the wire mid-computation. This is the split SIPS builds.
+  Nothing crosses the wire mid-computation. This is the split
+  `DistributedInference` builds.
 - **Tensor parallel**: every matmul is split; needs an all-reduce per layer at
   microsecond latency. A LAN's millisecond-scale round trips, ×24 layers,
   ×every token, is a budget nothing meets. NVLink exists because of this.
+  Still not built, for exactly this reason.
 - **Pipeline parallel**: split by layer; pays only when the model does not fit
-  in one machine's memory.
+  in one machine's memory. Built, deliberately for the case the rule below
+  says it survives — a batch streaming through for throughput, not one
+  request waited on for latency — see [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md).
+  Measured in-process only; the network round trip a real cluster adds at
+  every stage boundary is not yet part of that measurement.
 
 The rule generalises: **communication frequency must match link latency.** A
 phone on WiFi (122 ms p99) can carry a *round* of training (seconds–minutes of
 work per message) and never a *layer* (µs of work per message).
-[MOBILE_WORKERS.md](MOBILE_WORKERS.md) is this rule applied.
+[MOBILE_WORKERS.md](MOBILE_WORKERS.md) is this rule applied to phones;
+[MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) is this rule applied to a
+throughput pipeline and to routing requests across distinct expert models.
 
 ## 7. Distribution soundness is a property of the *expression*
 
@@ -176,6 +184,7 @@ unexamined one:
 | A uniform "garbage" model poisons a mean | softmax is shift-invariant; the attack was a no-op | attack demonstrations must be asymmetric to demonstrate anything |
 | A defined summation order guarantees a defined result (our own vector file) | vendor BLAS gap up to 1 ULP, isolated cleanly to matmul-routed cases | order ≠ result once an external library's accumulation grouping is involved; conformance vectors corrected |
 | iOS suspends a backgrounded process quickly (assumed, then tested where it could be) | the Simulator does not enforce suspension at all — `ps` showed the process still scheduled, unchanged, after backgrounding | Simulator validates the `scenePhase` notification path only; the execution-budget claim itself needs a physical device |
+| Balancing pipeline replicas by node speed (`ShardPlan`'s own lever) is enough | evenly split replicas left 25% of throughput on the table next to a hand-tuned allocation that targeted the true bottleneck stage | a pipeline's stages are not homogeneous in cost the way a sample batch is; a per-stage cost estimate feeding the planner is real, unstarted work — see [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) |
 
 ## Where to go next
 
@@ -184,6 +193,7 @@ unexamined one:
 | The op substrate, fusion, splitting | [ARRAY_OPS.md](ARRAY_OPS.md) | `SIPS-samples/ArrayProgramming` |
 | Distributed training end to end | [ML_TRAINING.md](ML_TRAINING.md) | `DistributedTraining`, `ZeroBarrierTraining` |
 | Batch inference and model shipping | [ML_TRAINING.md](ML_TRAINING.md) | `DistributedInference` |
+| Layer pipelines and expert-serving | [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) | `LayeredPipeline`, `ExpertServing` |
 | Portable sandboxed chunks | [WASM_TASKS.md](WASM_TASKS.md) | ABI conformance vectors |
 | Multi-stage jobs and data flow | [TASK_GRAPHS.md](TASK_GRAPHS.md) | — |
 | Version negotiation between nodes | [PROTOCOL.md](PROTOCOL.md) | — |
