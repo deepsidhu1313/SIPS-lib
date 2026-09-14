@@ -185,6 +185,7 @@ unexamined one:
 | A defined summation order guarantees a defined result (our own vector file) | vendor BLAS gap up to 1 ULP, isolated cleanly to matmul-routed cases | order ≠ result once an external library's accumulation grouping is involved; conformance vectors corrected |
 | iOS suspends a backgrounded process quickly (assumed, then tested where it could be) | the Simulator does not enforce suspension at all — `ps` showed the process still scheduled, unchanged, after backgrounding | Simulator validates the `scenePhase` notification path only; the execution-budget claim itself needs a physical device |
 | Balancing pipeline replicas by node speed (`ShardPlan`'s own lever) is enough | evenly split replicas left 25% of throughput on the table next to a hand-tuned allocation that targeted the true bottleneck stage | a pipeline's stages are not homogeneous in cost the way a sample batch is; a per-stage cost estimate feeding the planner is real, unstarted work — see [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) |
+| A cache that always promotes what it's asked for is at worst neutral | naive always-promote measured **worse than no fast tier at all** (37,484ms vs. 30,000ms) once a workload mixes in units not worth promoting | thrashing is real, not theoretical; a cost-aware promote-or-run-in-place decision beat naive by 3.69x on the identical workload — see [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) |
 
 ## Where to go next
 
@@ -193,7 +194,7 @@ unexamined one:
 | The op substrate, fusion, splitting | [ARRAY_OPS.md](ARRAY_OPS.md) | `SIPS-samples/ArrayProgramming` |
 | Distributed training end to end | [ML_TRAINING.md](ML_TRAINING.md) | `DistributedTraining`, `ZeroBarrierTraining` |
 | Batch inference and model shipping | [ML_TRAINING.md](ML_TRAINING.md) | `DistributedInference` |
-| Layer pipelines and expert-serving | [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) | `LayeredPipeline`, `ExpertServing` |
+| Layer pipelines, expert-serving, and elastic nodes | [MODEL_PARALLELISM.md](MODEL_PARALLELISM.md) | `LayeredPipeline`, `ExpertServing`, `ElasticNode` |
 | Portable sandboxed chunks | [WASM_TASKS.md](WASM_TASKS.md) | ABI conformance vectors |
 | Multi-stage jobs and data flow | [TASK_GRAPHS.md](TASK_GRAPHS.md) | — |
 | Version negotiation between nodes | [PROTOCOL.md](PROTOCOL.md) | — |

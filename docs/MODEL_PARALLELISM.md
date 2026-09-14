@@ -1,23 +1,25 @@
-# Model parallelism: layer pipelines and expert serving
+# Large-model research: layer pipelines, expert serving, and elastic nodes
 
 > Background: [primer §6](PRIMER.md#6-three-ways-to-split-a-model-and-the-two-that-dont-survive-ethernet)
 > (the three ways to split a model, and why two of them don't survive Ethernet)
 > is the reasoning everything below either follows or deliberately departs from.
 
-Two capabilities, born from the same question — can SIPS help research a
-model too large for one machine, spread across a heterogeneous cluster — and
-answered two different ways because they turned out to be two different
-problems.
+Three capabilities, born from the same question — can SIPS help research a
+model too large for one machine — and answered three different ways, because
+"too large for one machine" turned out to name at least two different
+problems: how to split work **across a cluster**, and how to fit more than
+one machine's own fast memory holds **on that one machine**.
 
-**Status: both are real, tested, scheduling-and-execution machinery, run and
-measured in-process on one machine. Neither has run over a real network or
+**Status: all three are real, tested, scheduling-and-execution machinery, run
+and measured in-process on one machine. None has run over a real network or
 against a real model.** That is not a minor footnote; see *What's deliberately
 absent* under each for exactly what it means and does not mean.
 
-## Why two capabilities, not one
+## Why three capabilities, not one
 
 The primer's own rule already answers why "split a large model across a
-cluster" is not one question:
+cluster" is not one question, and the third capability answers a question the
+primer doesn't ask at all:
 
 - A **pipeline** (`in.co.s13.sips.lib.ml.pipeline`) is what the primer calls
   pipeline parallelism, built for the case the primer says it survives:
@@ -33,11 +35,19 @@ cluster" is not one question:
   right now. The primer's rule about communication frequency still applies,
   but the thing being decided is routing, not gradient or activation
   exchange.
+- **Elastic nodes** (`in.co.s13.sips.lib.ml.elastic`) is not a cluster
+  question at all — it's what one node does with its *own* fast-but-small and
+  slow-but-large memory once a request arrives there, the mechanism a real
+  edge-native MoE serving engine ([FreeToken](https://github.com/FlashML-org/FreeToken))
+  uses to fit a model too big for one GPU's VRAM. It composes with the other
+  two rather than replacing either: a node running an expert-serving replica,
+  or hosting a pipeline stage, still has to decide what stays resident in its
+  own fast tier — that composition is real and unstarted, see below.
 
-Both reuse the existing op substrate and node-fitness machinery rather than
-inventing parallel infrastructure: a pipeline stage is an [`Expr`](ARRAY_OPS.md)
+All three reuse existing machinery rather than inventing parallel
+infrastructure: a pipeline stage is an [`Expr`](ARRAY_OPS.md)
 graph evaluated by the same `ArrayCompute` every other array op in this
-repository goes through, and both packages' balancing logic descends directly
+repository goes through, and all three packages' balancing logic descends directly
 from `ShardPlan`'s "balance by measured worth, not by guessing" principle.
 
 ## Pipeline parallelism for batch throughput
@@ -147,6 +157,62 @@ kind of finding this project keeps.
   nothing an expert would actually need to resume a conversation. Session
   *affinity* (routing) is what's built; session *state* (what to route to,
   and its recovery) is not.
+
+## Elastic nodes: one machine's own memory hierarchy
+
+Not a cluster capability — this is what happens *after* a request has already
+arrived at a node, and that node has to decide whether what it needs is
+already in its own fast-but-small memory or has to be fetched from its own
+slow-but-large memory first. `UnitProfile` describes one resident unit's size
+and cost (`fetchMillis` to promote it, `hotComputeMillis` once resident,
+`coldComputeMillis` to run it in place without promoting). `ElasticNodeCache`
+makes the actual decision on every access: promote and pay the transfer cost,
+or run in place — an LRU policy evicts the least-recently-used resident unit
+when room is needed, and an `adaptive` flag lets a caller compare that
+cost-aware decision against a naive always-promote cache on the identical
+workload, since a policy that can't be measured against a simpler alternative
+hasn't proven anything.
+
+**Measured** (`SIPS-samples/ElasticNode`, 5,000 accesses across six cheap,
+popular "good" units and two expensive, unpopular "bad" ones sized so
+promoting one "bad" unit evicts three "good" ones):
+
+```
+configuration                          total ms     promotions
+no fast tier at all                       30000              0
+naive (always promote)                    37484           2538
+adaptive (cost-aware)                     10152            706
+```
+
+The naive always-promote policy is not merely worse than adaptive — it is
+worse than having no fast tier at all (37,484ms vs. 30,000ms). Every access to
+a "bad" unit evicts several "good" ones to make room, and those good units
+then pay to be re-promoted the next time they're needed: classic thrashing,
+produced by a workload built specifically to trigger it, not smoothed away by
+picking only uniformly-good candidates. The adaptive policy checks the actual
+numbers per access, correctly declines to promote either "bad" unit, and
+keeps the popular units resident — a real 3.69× improvement over naive, not
+an assumed one.
+
+### What's deliberately absent
+
+- **No real GPU, no real transfer, no real bandwidth measurement.** Every
+  cost is a declared number, not measured off real hardware the way
+  `WorkerBench` measures a node's own compute or the busy-endpoint findings
+  measure a real link. A genuinely bandwidth-adaptive version would measure
+  its own transfer rate rather than take it as a constructor argument.
+- **No composition with the other two capabilities yet.** A node running an
+  expert-serving replica or hosting a pipeline stage does not yet consult an
+  `ElasticNodeCache` to decide what of its own workload stays resident — the
+  three packages are real, tested, and independently useful, but nothing
+  wires them into one system yet. That wiring is real, unstarted work, not
+  a small addition: it would mean `ExpertServingRunner`'s `RequestExecutor`
+  (or `PipelineRunner`'s `LayerExecutor`) consulting a per-node cache instead
+  of assuming its work is always immediately ready.
+- **Coarse-grained locking.** Every public method on `ElasticNodeCache` is
+  `synchronized`, a real, stated bottleneck if this sits on a hot path under
+  heavy concurrent access — correctness over performance was the right choice
+  for a first version, not an oversight to leave undocumented.
 
 ## The negative finding, for the primer's own register
 
