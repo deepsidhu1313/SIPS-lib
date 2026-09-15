@@ -21,6 +21,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The reactive rebalancer: add a replica when an expert is hot, and only when
@@ -102,5 +104,41 @@ class HotExpertPolicyTest {
 
         assertEquals(0, added);
         assertEquals(List.of("node-a"), experts.replicasOf("coder"));
+    }
+
+    @Test
+    void theMostSeverelyOverloadedExpertWinsTheOneGenuinelyScarceCandidate() {
+        ExpertRegistry experts = new ExpertRegistry();
+        // e1: depth 10 (severity 7), e2: depth 7 (severity 4), e3: depth 5 (severity 2) --
+        // each expert's home node is its only existing replica, so totalQueueDepth resolves.
+        experts.addReplica("e1", "home-e1");
+        for (int i = 0; i < 10; i++) {
+            experts.beginRequest("e1", "home-e1");
+        }
+        experts.addReplica("e2", "home-e2");
+        for (int i = 0; i < 7; i++) {
+            experts.beginRequest("e2", "home-e2");
+        }
+        experts.addReplica("e3", "home-e3");
+        for (int i = 0; i < 5; i++) {
+            experts.beginRequest("e3", "home-e3");
+        }
+        HotExpertPolicy policy = new HotExpertPolicy(3);
+        // Every home node is far too small to host any of the three experts; "big-spare" has
+        // just enough memory for exactly ONE of them, so once one expert's replica lands there,
+        // the memory-depletion accounting must rule the other two out within the same call.
+        Map<String, Long> nodeMemoryBytes = Map.of(
+                "home-e1", 10L, "home-e2", 10L, "home-e3", 10L, "big-spare", 500L);
+        Map<String, Long> expertWeightBytes = Map.of("e1", 500L, "e2", 500L, "e3", 500L);
+
+        // Passed out of severity order -- e3 (least severe) is listed first, e1 (most severe)
+        // last -- so a correct result here can only come from sorting by severity, not from
+        // input order.
+        int added = policy.rebalance(experts, List.of("e3", "e2", "e1"), nodeMemoryBytes, expertWeightBytes);
+
+        assertEquals(1, added);
+        assertTrue(experts.replicasOf("e1").contains("big-spare"), "e1, the most severe, should win big-spare");
+        assertFalse(experts.replicasOf("e2").contains("big-spare"), "e2 must not also fit on the depleted node");
+        assertFalse(experts.replicasOf("e3").contains("big-spare"), "e3 must not also fit on the depleted node");
     }
 }

@@ -11,9 +11,12 @@ problems: how to split work **across a cluster**, and how to fit more than
 one machine's own fast memory holds **on that one machine**.
 
 **Status: all three are real, tested, scheduling-and-execution machinery, run
-and measured in-process on one machine. None has run over a real network or
-against a real model.** That is not a minor footnote; see *What's deliberately
-absent* under each for exactly what it means and does not mean.
+and measured in-process on one machine, and now compose with each other where
+that composition makes sense (a node hosting a pipeline stage or an expert
+replica can consult its own elastic cache — see each section below). None has
+run over a real network or against a real model, and none has real fault
+tolerance.** That is not a minor footnote; see *What's deliberately absent*
+under each for exactly what it means and does not mean.
 
 ## Why three capabilities, not one
 
@@ -59,26 +62,38 @@ an item happens to flow through it. `PipelineModel` orders the groups.
 `PipelinePlan.assign` decides which node runs which stage and how many
 replicas of each, filtering by memory eligibility first — a stage whose
 weights do not fit on any node is a real, reportable planning failure, not a
-shard to quietly shrink. `PipelineRunner` streams items through real,
+shard to quietly shrink — and, given a per-stage cost map from
+`PipelinePlan.measureStageCost`, weighs each stage's *items/second capacity*
+rather than raw assigned node speed alone (see *the negative finding* below
+for why this was added). `PipelineRunner` streams items through real,
 concurrently running stages on `java.util.concurrent` primitives, wired queue
-to queue, so a throughput number measured against it means something.
+to queue, optionally with a bounded `queueCapacity` so a producer stage faster
+than its consumer genuinely blocks instead of growing that queue without
+limit. `ElasticLayerExecutor` lets a node hosting a stage consult its own
+`ElasticNodeCache` on every access, opt-in per node (see *elastic nodes*
+below) — a `LayerExecutor` composing with another `LayerExecutor`, not a
+special case either package needs to know about.
 
 **Measured** (`SIPS-samples/LayeredPipeline`, macOS Intel i7-9750H, 4,000
 items across a 3-stage toy model with one deliberately expensive stage):
 
 ```
 configuration                      wall time       throughput
-one replica per stage                 752 ms         5319 items/s
-PipelinePlan.assign, 6 nodes          542 ms         7380 items/s
-hand-tuned at the bottleneck          432 ms         9259 items/s
+one replica per stage                 165 ms        24242 items/s
+PipelinePlan.assign, cost-blind        84 ms        47619 items/s
+hand-tuned at the bottleneck           77 ms        51948 items/s
+PipelinePlan.assign, cost-aware        49 ms        81633 items/s
 ```
 
-Replicating the true bottleneck genuinely helps — 1.74× over the minimal
+Replicating the true bottleneck genuinely helps — over 2× the minimal
 baseline — which validates `PipelineRunner` as a real execution mechanism,
-not just plumbing. But `PipelinePlan.assign`, given the same nodes, split them
-evenly instead of concentrating on the bottleneck, landing 25% below what a
-caller who knew the per-stage cost could build by hand. See *the negative
-finding* below for why, and what it implies for what to build next.
+not just plumbing. The cost-blind plan splits nodes evenly and leaves real
+throughput on the table next to a hand-tuned allocation, exactly the gap *the
+negative finding* below describes. Fed `measureStageCost`'s real per-stage
+numbers instead, the planner beats the cost-blind plan every repeated run
+(1.2×–3.0× across several runs) and sometimes beats the hand-tuned guess too,
+since it also correctly weighs the stage the hand-tuned guess assumed was
+free.
 
 ### What's deliberately absent
 
@@ -88,35 +103,35 @@ finding* below for why, and what it implies for what to build next.
   instead — the queueing, replication, and shutdown logic would not need to
   change — but that executor does not exist yet, and the round trip a real
   cluster would add to every stage boundary is entirely unmeasured.
-- **No per-stage cost model feeding the planner.** `PipelinePlan.assign`
-  balances replicas by *node speed*, the lever `ShardPlan` has for a
-  homogeneous batch of samples. A pipeline's stages are not homogeneous in
-  cost, and nothing here measures a stage's own expense — the way
-  `WorkerBench` measures a node — to weigh against it. This is the single
-  most consequential thing to build next; the measured gap above is the
-  argument for building it, not a guess.
-- **No streaming backpressure.** Queues between stages are unbounded. A
-  producer stage faster than its consumer will grow that queue without limit
-  rather than slow down — fine for a bounded demo batch, a real liability for
-  an unbounded, long-running stream.
 - **No fault tolerance.** A node holding one stage's only replica going away
-  mid-run is not handled; the pipeline simply stalls behind it.
+  mid-run is not handled; the pipeline simply stalls behind it. This depends
+  on the real network layer above existing first.
 
 ## Expert serving for multi-turn, multi-client throughput
 
 `ExpertRegistry` tracks which nodes host which experts and each (expert,
 node) pair's live queue depth. `SessionRegistry` pins a session to a node
 with expiry, against an injected clock so tests move time forward
-deterministically rather than sleeping through a real timeout. `ExpertRouter`
-resolves the pull between session affinity and load balancing with a strict
-priority — affinity wins, but only when the pinned node can actually serve
-the expert this specific request needs, since a session's pin may be left
-over from an earlier request to a different expert entirely. `HotExpertPolicy`
-adds a replica of an overloaded expert reactively rather than provisioning
-every expert for a worst case that may never come. `ExpertServingRunner`
-drives all of it with real threads and real elapsed time; what an expert
-actually computes is out of scope on purpose, the same way `ShardPlan` never
-runs the training step it divides work for.
+deterministically rather than sleeping through a real timeout, carries an
+opaque per-session `state` object across re-pins, and can mark a node
+unavailable — a pinned session then reads as unpinned for routing without
+losing that state. `ExpertRouter` resolves the pull between session affinity
+and load balancing with a strict priority — affinity wins, but only when the
+pinned node can actually serve the expert this specific request needs, since
+a session's pin may be left over from an earlier request to a different
+expert entirely — and reports when a fallback routing decision is recovering
+a session that carried real state, as opposed to a genuinely fresh one.
+`HotExpertPolicy` adds a replica of an overloaded expert reactively rather
+than provisioning every expert for a worst case that may never come, now
+processing several simultaneously-hot experts in order of actual severity and
+tracking a node's memory as it depletes within one rebalance call, so two
+experts cannot each be handed a replica on a node that could only ever hold
+one of them. `ExpertServingRunner` drives all of it with real threads and
+real elapsed time; what an expert actually computes is out of scope on
+purpose, the same way `ShardPlan` never runs the training step it divides
+work for. `ElasticRequestExecutor` lets a node consult its own
+`ElasticNodeCache` before serving a request, the same composition pattern the
+pipeline package uses (see *elastic nodes* below).
 
 **Measured** (`SIPS-samples/ExpertServing`, macOS Intel i7-9750H, 300 turns
 across 20 multi-turn sessions, one expert deliberately popular at 70% of
@@ -124,16 +139,17 @@ traffic):
 
 ```
 run                             count     p50 ms     p99 ms affinity hit
-static (1 replica each)           300       3.45      40.59        83.0%
-adaptive (HotExpertPolicy)        300       3.26       3.87        89.0%
+static (1 replica each)           300       3.84      33.10        78.7%
+adaptive (HotExpertPolicy)        300       3.70       4.65        83.7%
 ```
 
-p99 latency improved roughly 10–12× across repeated runs once the hot
-expert's queue depth crossed the rebalancing threshold and a second replica
-absorbed the load — measured with the identical turn sequence and an
-identical pause inserted at the identical point in both runs, so the
-difference is the rebalance decision and not the pause itself giving the
-pool a moment to catch up. One early run, before that control was in place,
+p99 latency improved roughly 5.7–12× across runs in this and the previous
+release (machine load, not a regression, explains the width of that range)
+once the hot expert's queue depth crossed the rebalancing threshold and a
+second replica absorbed the load — measured with the identical turn sequence
+and an identical pause inserted at the identical point in both runs, so the
+difference is the rebalance decision and not the pause itself giving the pool
+a moment to catch up. One early run, before that control was in place,
 showed almost no difference — kept in `SIPS-samples/ExpertServing/Readme.md`
 rather than discarded, since a demo's own measurement bug is exactly the
 kind of finding this project keeps.
@@ -143,20 +159,12 @@ kind of finding this project keeps.
 - **No real network, no real expert models.** Every "expert" is a stand-in
   callback; every "node" is a label. What's real is the scheduling logic
   around them, which is this package's actual job.
-- **No prioritisation among several simultaneously hot experts.**
-  `HotExpertPolicy.rebalance` processes experts in whatever order it is
-  given and adds at most one replica per over-threshold expert per call —
-  it has no notion of ranking multiple hot experts against each other for a
-  limited pool of spare capacity, and nothing in the current sample creates
-  that contention to test against.
-- **No session migration.** If the node a session is pinned to disappears
-  mid-conversation, the session simply fails to route on its next turn.
-  Recovering session state elsewhere is unstarted work.
-- **No persistent session state.** `Session` carries only a pinned node uuid
-  and a last-seen time — no conversation history, no KV-cache reference,
-  nothing an expert would actually need to resume a conversation. Session
-  *affinity* (routing) is what's built; session *state* (what to route to,
-  and its recovery) is not.
+- **No automatic failure detection.** `SessionRegistry.markUnavailable` and
+  `ExpertRegistry`'s replica set are both changed only by explicit caller
+  action here — nothing watches a real node and calls either on its own, and
+  there is no way to retract a replica once `ExpertRegistry.addReplica` has
+  registered it. This depends on the real network layer above existing
+  first, the same as pipeline fault tolerance.
 
 ## Elastic nodes: one machine's own memory hierarchy
 
@@ -171,7 +179,11 @@ or run in place — an LRU policy evicts the least-recently-used resident unit
 when room is needed, and an `adaptive` flag lets a caller compare that
 cost-aware decision against a naive always-promote cache on the identical
 workload, since a policy that can't be measured against a simpler alternative
-hasn't proven anything.
+hasn't proven anything. `TransferCost.profileFor` now measures a real
+`fetchMillis` (a timed `System.arraycopy` of the unit's own byte size) instead
+of taking it as a declared constant. `ElasticLayerExecutor` and
+`ElasticRequestExecutor` compose this cache into the pipeline and serving
+packages respectively, opt-in per node.
 
 **Measured** (`SIPS-samples/ElasticNode`, 5,000 accesses across six cheap,
 popular "good" units and two expensive, unpopular "bad" ones sized so
@@ -180,50 +192,71 @@ promoting one "bad" unit evicts three "good" ones):
 ```
 configuration                          total ms     promotions
 no fast tier at all                       30000              0
-naive (always promote)                    37484           2538
-adaptive (cost-aware)                     10152            706
+naive (always promote)                    13059           2538
+adaptive (cost-aware)                     10234            706
 ```
 
-The naive always-promote policy is not merely worse than adaptive — it is
-worse than having no fast tier at all (37,484ms vs. 30,000ms). Every access to
-a "bad" unit evicts several "good" ones to make room, and those good units
-then pay to be re-promoted the next time they're needed: classic thrashing,
-produced by a workload built specifically to trigger it, not smoothed away by
-picking only uniformly-good candidates. The adaptive policy checks the actual
-numbers per access, correctly declines to promote either "bad" unit, and
-keeps the popular units resident — a real 3.69× improvement over naive, not
-an assumed one.
+The adaptive policy still beats naive outright (1.28× faster, 706 promotions
+against naive's 2,538) by correctly declining to promote a "bad" unit
+whenever `fetch + hotCompute` exceeds `coldCompute`. What changed from the
+previous release: with `fetchMillis` now a real measured number rather than a
+declared 50ms constant, naive always-promote is *not* worse than no fast tier
+at all (2.30× faster, not 0.80× slower) — that finding was an artifact of a
+declared cost 25× larger than a 3×-larger unit's real transfer cost, and did
+not survive real measurement. See *the negative finding* below for the fuller
+account; the mechanism (checking real costs beats blind promotion) held, the
+specific "worse than nothing" headline did not.
 
 ### What's deliberately absent
 
-- **No real GPU, no real transfer, no real bandwidth measurement.** Every
-  cost is a declared number, not measured off real hardware the way
-  `WorkerBench` measures a node's own compute or the busy-endpoint findings
-  measure a real link. A genuinely bandwidth-adaptive version would measure
-  its own transfer rate rather than take it as a constructor argument.
-- **No composition with the other two capabilities yet.** A node running an
-  expert-serving replica or hosting a pipeline stage does not yet consult an
-  `ElasticNodeCache` to decide what of its own workload stays resident — the
-  three packages are real, tested, and independently useful, but nothing
-  wires them into one system yet. That wiring is real, unstarted work, not
-  a small addition: it would mean `ExpertServingRunner`'s `RequestExecutor`
-  (or `PipelineRunner`'s `LayerExecutor`) consulting a per-node cache instead
-  of assuming its work is always immediately ready.
+- **No real GPU, no real model.** Every "unit" is a name plus a real measured
+  transfer cost and two declared compute numbers — there is no real
+  accelerator kernel or model weight behind either compute number.
+- **Bandwidth measured locally, not over a real link.** `TransferCost` times
+  a real `System.arraycopy` between two heap arrays on one machine — a real
+  number, but the honest ceiling on what is measurable without real
+  PCIe/NVLink or network bindings, not equivalent to a real transfer.
+- **Composition covers wiring, not scheduling.** `ElasticLayerExecutor` and
+  `ElasticRequestExecutor` let a node's cache observe real traffic passing
+  through a real executor; neither package's own scheduling decision (which
+  replica runs an item, which node serves a request) is influenced by cache
+  state yet. A planner or router that preferred a node already holding what
+  it needs hot is real, unstarted work on top of what this release adds.
 - **Coarse-grained locking.** Every public method on `ElasticNodeCache` is
   `synchronized`, a real, stated bottleneck if this sits on a hot path under
   heavy concurrent access — correctness over performance was the right choice
   for a first version, not an oversight to leave undocumented.
 
-## The negative finding, for the primer's own register
+## The negative findings, for the primer's own register
 
-`PipelinePlan.assign` mirrors `ShardPlan`'s principle — balance discrete
-resources by measured worth — applied to something `ShardPlan` never had to
-handle: work that is not homogeneous. `ShardPlan` divides a single, uniform
-batch of samples, so node speed alone is the whole story. A pipeline's stages
-genuinely differ in cost, and node speed alone materially under-serves the
-true bottleneck — measured directly above, not assumed. The fix is not a
-bigger balancing formula; it is a missing input; a per-stage cost estimate,
-measured the way this project measures everything else, rather than declared.
-Recorded here because a refuted assumption about what "balance the cluster"
-requires is worth exactly as much as a confirmed one, which is the whole
-premise of keeping this register at all.
+**Cost-blind balancing under-serves a pipeline's true bottleneck — fixed,
+not just found.** `PipelinePlan.assign` mirrored `ShardPlan`'s principle —
+balance discrete resources by measured worth — applied to something
+`ShardPlan` never had to handle: work that is not homogeneous. `ShardPlan`
+divides a single, uniform batch of samples, so node speed alone is the whole
+story; a pipeline's stages genuinely differ in cost, and node speed alone
+materially under-served the true bottleneck, measured directly above. The
+fix was not a bigger balancing formula; it was a missing input — a per-stage
+cost estimate, now `PipelinePlan.measureStageCost`, measured the way this
+project measures everything else rather than declared, and fed into a new
+`assign` overload. Recorded here, resolved and not deleted, because a
+refuted assumption about what "balance the cluster" requires is worth
+exactly as much before and after it's fixed — the register is a history, not
+a live TODO list to prune once an item closes.
+
+**A declared cost can manufacture a finding that real measurement erases.**
+`SIPS-samples/ElasticNode`'s first release declared a "bad" unit's transfer
+cost as a flat 50ms against a "good" unit's 2ms — a 25× gap for units only 3×
+apart in size — and found naive always-promote caching *worse than no cache
+at all*. Once `TransferCost` measured that cost for real instead (a real
+`System.arraycopy` scaling roughly linearly with bytes moved, as transfer
+cost actually should), the gap shrank to roughly 3×, and the "worse than
+nothing" finding did not survive: naive always-promote turned out to beat no
+caching after all, just by less than the adaptive policy does. The
+underlying mechanism this sample exists to show — checking real costs beats
+blind promotion — was never in question and remains measured true. What was
+wrong was a specific, more dramatic headline resting on an unmeasured input.
+Recorded here for the same reason as the entry above: not because the
+mistake was large, but because a wrong finding correcting itself once a
+placeholder became a real measurement is exactly the kind of event this
+register exists to keep visible rather than quietly overwrite.

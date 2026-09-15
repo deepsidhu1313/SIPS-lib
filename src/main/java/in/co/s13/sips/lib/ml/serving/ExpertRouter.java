@@ -51,15 +51,25 @@ public final class ExpertRouter {
         this.sessions = sessions;
     }
 
-    /** Where a request landed, and whether it landed there because of session affinity. */
-    public record Routed(String nodeUuid, boolean sessionAffinityHit) {
+    /**
+     * Where a request landed, whether it landed there because of session affinity, and whether
+     * landing elsewhere counted as recovering a session that already carried state (as opposed
+     * to a genuinely fresh one) — see {@link #route} for exactly when each is set.
+     */
+    public record Routed(String nodeUuid, boolean sessionAffinityHit, boolean recovered) {
     }
 
     /**
      * Routes one request for {@code expertId} on behalf of {@code sessionId}.
      *
      * <p>Prefers the session's pinned node when that node actually hosts the requested expert;
-     * otherwise falls back to the least-loaded replica and re-pins the session there.
+     * otherwise falls back to the least-loaded replica and re-pins the session there. The pinned
+     * node reads as absent — and this method falls through the same way — whether the session
+     * was never pinned, has expired, or its previously-pinned node has since been marked
+     * unavailable. In that fallback case, a non-empty {@link SessionRegistry#stateFor} means the
+     * session existed before with real carried-over state, so this is a recovery rather than a
+     * fresh session; {@code recovered} reports exactly that. A normal affinity hit is never
+     * itself a recovery.
      */
     public Routed route(String sessionId, String expertId) {
         Optional<String> pinned = sessions.nodeFor(sessionId);
@@ -67,11 +77,12 @@ public final class ExpertRouter {
             List<String> replicas = experts.replicasOf(expertId);
             if (replicas.contains(pinned.get())) {
                 sessions.touch(sessionId);
-                return new Routed(pinned.get(), true);
+                return new Routed(pinned.get(), true, false);
             }
         }
+        boolean recovered = sessions.stateFor(sessionId).isPresent();
         String chosen = experts.leastLoaded(expertId);
         sessions.pin(sessionId, chosen);
-        return new Routed(chosen, false);
+        return new Routed(chosen, false, recovered);
     }
 }

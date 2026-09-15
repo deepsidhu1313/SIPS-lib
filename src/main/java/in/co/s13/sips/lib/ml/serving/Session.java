@@ -23,8 +23,14 @@ package in.co.s13.sips.lib.ml.serving;
  * node already holds its context than on whichever replica happens to be
  * least loaded this instant, so {@link SessionRegistry} remembers this pin
  * until it expires.
+ *
+ * <p>{@code state} is an opaque payload this package never inspects — a
+ * conversation history, a KV-cache reference, whatever a caller needs to
+ * resume this session elsewhere. It is what is supposed to survive a pin
+ * being replaced, whether by ordinary re-pinning or by recovery onto a
+ * different node after the pinned one becomes unavailable.
  */
-public record Session(String sessionId, String nodeUuid, long lastSeenMillis) {
+public record Session(String sessionId, String nodeUuid, long lastSeenMillis, Object state) {
 
     public Session {
         if (sessionId == null || sessionId.isBlank()) {

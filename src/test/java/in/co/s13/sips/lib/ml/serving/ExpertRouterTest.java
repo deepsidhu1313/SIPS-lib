@@ -44,6 +44,7 @@ class ExpertRouterTest {
 
         assertEquals("node-b", routed.nodeUuid());
         assertFalse(routed.sessionAffinityHit());
+        assertFalse(routed.recovered());
         assertEquals(Optional.of("node-b"), sessions.nodeFor("s1"));
     }
 
@@ -65,6 +66,7 @@ class ExpertRouterTest {
 
         assertEquals("node-a", routed.nodeUuid());
         assertTrue(routed.sessionAffinityHit());
+        assertFalse(routed.recovered());
     }
 
     @Test
@@ -81,6 +83,50 @@ class ExpertRouterTest {
 
         assertEquals("node-b", routed.nodeUuid());
         assertFalse(routed.sessionAffinityHit());
+        // s1 was pinned before, but never carried any state, so this is a fresh fallback,
+        // not a recovery.
+        assertFalse(routed.recovered());
         assertEquals(Optional.of("node-b"), sessions.nodeFor("s1"));
+    }
+
+    @Test
+    void aSessionWithPriorStateRecoversToADifferentNodeWhenItsNodeGoesUnavailable() {
+        ExpertRegistry experts = new ExpertRegistry();
+        experts.addReplica("coder", "node-a");
+        experts.addReplica("coder", "node-b");
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), Clock.systemUTC());
+        sessions.pin("s1", "node-a");
+        sessions.updateState("s1", "conversation-history");
+        ExpertRouter router = new ExpertRouter(experts, sessions);
+        // s1 is happily pinned to node-a and would keep hitting it...
+        assertTrue(router.route("s1", "coder").sessionAffinityHit());
+
+        // ...until node-a disappears mid-conversation. Loading node-a up first ensures the
+        // fallback below genuinely picks node-b on its own load-balancing merits, rather than
+        // by a tie-break that would happen to also pick node-a if both sat at equal depth.
+        experts.beginRequest("coder", "node-a");
+        experts.beginRequest("coder", "node-a");
+        sessions.markUnavailable("node-a");
+
+        ExpertRouter.Routed routed = router.route("s1", "coder");
+
+        assertEquals("node-b", routed.nodeUuid());
+        assertFalse(routed.sessionAffinityHit());
+        assertTrue(routed.recovered(), "a session with real prior state landing elsewhere is a recovery");
+        assertEquals(Optional.of("conversation-history"), sessions.stateFor("s1"));
+    }
+
+    @Test
+    void aGenuinelyFreshSessionsFirstRouteIsNeverAReportedRecovery() {
+        ExpertRegistry experts = new ExpertRegistry();
+        experts.addReplica("coder", "node-a");
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), Clock.systemUTC());
+        ExpertRouter router = new ExpertRouter(experts, sessions);
+
+        ExpertRouter.Routed routed = router.route("brand-new-session", "coder");
+
+        assertEquals("node-a", routed.nodeUuid());
+        assertFalse(routed.sessionAffinityHit());
+        assertFalse(routed.recovered());
     }
 }

@@ -147,4 +147,71 @@ class PipelinePlanTest {
         assertThrows(UnsupportedOperationException.class,
                 () -> assignment.replicasByStage().put(1, List.of("c")));
     }
+
+    @Test
+    void costAwareAssignConcentratesExtraReplicasOnTheTrueBottleneck() {
+        // Six equal-speed, equal-memory nodes; two stages of genuinely
+        // different declared cost. Pass one claims "a" for cheap and "b" for
+        // expensive (both tied at speed 1.0, so the tie-break -- lowest uuid
+        // -- picks them in that order), leaving four nodes for pass two.
+        PipelineModel model = new PipelineModel(List.of(stage("cheap", 2), stage("expensive", 2)));
+        List<PipelinePlan.NodeCapacity> nodes = List.of(
+                node("a", 1000, 1.0), node("b", 1000, 1.0), node("c", 1000, 1.0),
+                node("d", 1000, 1.0), node("e", 1000, 1.0), node("f", 1000, 1.0));
+        Map<String, Double> costs = Map.of("cheap", 1.0, "expensive", 4.0);
+
+        PipelinePlan.Assignment costAware = PipelinePlan.assign(model, nodes, costs);
+
+        // expensive's items/second capacity (totalSpeed / cost) trails
+        // cheap's until it has been given four of the six nodes total, at
+        // which point cheap -- now the lower-capacity stage -- takes the
+        // last leftover node instead.
+        assertEquals(2, costAware.replicaCount(0), costAware.toString());
+        assertEquals(4, costAware.replicaCount(1), costAware.toString());
+
+        // Companion assertion: the plain, cost-blind overload on the
+        // identical model and nodes is the documented negative finding --
+        // it has no way to see that "expensive" is the real bottleneck, so
+        // it spreads the leftover nodes evenly instead.
+        PipelinePlan.Assignment costBlind = PipelinePlan.assign(model, nodes);
+
+        assertEquals(3, costBlind.replicaCount(0), costBlind.toString());
+        assertEquals(3, costBlind.replicaCount(1), costBlind.toString());
+    }
+
+    @Test
+    void measureStageCostRatesTheHeavierStageMoreExpensive() {
+        Mat input = new Mat(32, 32, new float[32 * 32]);
+        LayerGroup cheap = matmulStage("cheap", 32);
+        LayerGroup expensive = matmulStage("expensive", 2048);
+
+        double cheapMillis = PipelinePlan.measureStageCost(cheap, input, 3, 5);
+        double expensiveMillis = PipelinePlan.measureStageCost(expensive, input, 3, 5);
+
+        assertTrue(expensiveMillis > cheapMillis,
+                "expected the 64x-larger hidden dimension to cost more; cheap=" + cheapMillis
+                        + "ms expensive=" + expensiveMillis + "ms");
+    }
+
+    @Test
+    void measureStageCostRejectsBadArguments() {
+        Mat input = new Mat(1, 1, new float[]{0f});
+        LayerGroup s = stage("s", 1);
+
+        assertThrows(IllegalArgumentException.class, () -> PipelinePlan.measureStageCost(null, input, 0, 1));
+        assertThrows(IllegalArgumentException.class, () -> PipelinePlan.measureStageCost(s, null, 0, 1));
+        assertThrows(IllegalArgumentException.class, () -> PipelinePlan.measureStageCost(s, input, -1, 1));
+        assertThrows(IllegalArgumentException.class, () -> PipelinePlan.measureStageCost(s, input, 0, 0));
+    }
+
+    /** A matmul-then-relu stage: fixed {@code act (32 x 32)} against {@code w (32 x hidden)} -- the same input shape for every {@code hidden}, only the weight (and so the cost) grows. */
+    private static LayerGroup matmulStage(String name, int hidden) {
+        Expr graph = Expr.input("act", 32, 32).matmul(Expr.input("w", 32, hidden)).relu();
+        float[] weightData = new float[32 * hidden];
+        for (int i = 0; i < weightData.length; i++) {
+            weightData[i] = (i % 7) * 0.01f;
+        }
+        Mat weight = new Mat(32, hidden, weightData);
+        return new LayerGroup(name, graph, "act", Map.of("w", weight));
+    }
 }

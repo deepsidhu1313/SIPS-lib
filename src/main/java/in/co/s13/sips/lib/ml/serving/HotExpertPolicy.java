@@ -18,6 +18,8 @@ package in.co.s13.sips.lib.ml.serving;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,23 +47,38 @@ public final class HotExpertPolicy {
     }
 
     /**
-     * Adds one replica for each expert in {@code expertIds} (processed in order) whose total
-     * queue depth across its current replicas is at or above the threshold, choosing the
-     * eligible candidate node with the lowest total queue depth across everything it already
-     * hosts. An over-threshold expert with no eligible candidate is skipped, not an error.
+     * Adds one replica for each expert in {@code expertIds} whose total queue depth across its
+     * current replicas is at or above the threshold, choosing the eligible candidate node with
+     * the lowest total queue depth across everything it already hosts. Experts are processed in
+     * order of severity — {@code totalQueueDepth(expertId) - queueDepthThreshold} — most
+     * severely overloaded first (ties broken by expertId, ascending), rather than in whatever
+     * order {@code expertIds} happens to list them, so that when several experts are
+     * simultaneously hot and spare capacity is scarce, the worst-off expert is served first. A
+     * node's memory is tracked as it depletes across replicas placed earlier in this same call,
+     * so two different experts cannot each be handed a replica on a node that could not actually
+     * hold both of them. An over-threshold expert with no eligible candidate remaining is
+     * skipped, not an error.
      *
      * @return the total number of replicas actually added
      */
     public int rebalance(ExpertRegistry experts, List<String> expertIds, Map<String, Long> nodeMemoryBytes,
             Map<String, Long> expertWeightBytes) {
+        List<String> orderedExpertIds = new ArrayList<>(expertIds);
+        Comparator<String> bySeverityDesc = Comparator
+                .comparingLong((String expertId) -> totalQueueDepth(experts, expertId) - queueDepthThreshold)
+                .reversed();
+        orderedExpertIds.sort(bySeverityDesc.thenComparing(Comparator.naturalOrder()));
+
+        Map<String, Long> remainingMemory = new HashMap<>(nodeMemoryBytes);
         int added = 0;
-        for (String expertId : expertIds) {
+        for (String expertId : orderedExpertIds) {
             if (totalQueueDepth(experts, expertId) < queueDepthThreshold) {
                 continue;
             }
-            String candidate = bestCandidate(experts, expertId, expertIds, nodeMemoryBytes, expertWeightBytes);
+            String candidate = bestCandidate(experts, expertId, orderedExpertIds, remainingMemory, expertWeightBytes);
             if (candidate != null) {
                 experts.addReplica(expertId, candidate);
+                remainingMemory.merge(candidate, -expertWeightBytes.getOrDefault(expertId, 0L), Long::sum);
                 added++;
             }
         }
@@ -77,19 +94,19 @@ public final class HotExpertPolicy {
     }
 
     private String bestCandidate(ExpertRegistry experts, String expertId, List<String> expertIds,
-            Map<String, Long> nodeMemoryBytes, Map<String, Long> expertWeightBytes) {
+            Map<String, Long> remainingMemory, Map<String, Long> expertWeightBytes) {
         List<String> currentReplicas = experts.replicasOf(expertId);
         long requiredBytes = expertWeightBytes.getOrDefault(expertId, 0L);
 
         String best = null;
         long bestLoad = Long.MAX_VALUE;
-        List<String> candidates = new ArrayList<>(nodeMemoryBytes.keySet());
+        List<String> candidates = new ArrayList<>(remainingMemory.keySet());
         Collections.sort(candidates);
         for (String candidate : candidates) {
             if (currentReplicas.contains(candidate)) {
                 continue;
             }
-            if (nodeMemoryBytes.get(candidate) < requiredBytes) {
+            if (remainingMemory.get(candidate) < requiredBytes) {
                 continue;
             }
             long load = totalLoadOn(experts, candidate, expertIds);

@@ -31,9 +31,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * stages, so a throughput number measured against it means something.
  *
  * <p>A {@link PipelinePlan.Assignment} is a static decision; this class is
- * what makes it actually move items. Each stage gets its own bounded-nowhere
- * queue and its own fixed thread pool sized to its replica count, wired queue
- * to queue so stage {@code i}'s output becomes stage {@code i+1}'s input —
+ * what makes it actually move items. Each stage gets its own queue — bounded
+ * only if a {@code queueCapacity} is given, unbounded otherwise — and its own
+ * fixed thread pool sized to its replica count, wired queue to queue so stage
+ * {@code i}'s output becomes stage {@code i+1}'s input —
  * the pipeline a plan describes, running. It is deliberately not a simulation
  * with sleeps standing in for work: the whole reason to model pipeline
  * parallelism this way is to get a scheduling and throughput story that is
@@ -57,6 +58,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * replica that observes the count reach zero forwards it downstream — so
  * exactly one sentinel is ever in flight per stage, and it cannot reach the
  * next stage until this one has genuinely finished.
+ *
+ * <p>A capacity-bounded queue changes nothing about that shutdown protocol —
+ * {@link #putOrInterrupt} already blocks until there is room, whether the
+ * item is a real one or a re-queued sentinel, and the sibling replicas
+ * draining the same input queue concurrently are exactly what makes that
+ * block temporary rather than permanent. What a bound buys is real
+ * backpressure: {@link #submit}'s underlying {@code put()} blocks the caller
+ * once a slower downstream stage falls behind, instead of letting the queue
+ * between them grow without limit the way an unbounded one would.
  */
 public final class PipelineRunner implements AutoCloseable {
 
@@ -85,6 +95,22 @@ public final class PipelineRunner implements AutoCloseable {
     private final List<ExecutorService> pools;
 
     public PipelineRunner(PipelineModel model, PipelinePlan.Assignment assignment, LayerExecutor executor) {
+        this(model, assignment, executor, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Same as {@link #PipelineRunner(PipelineModel, PipelinePlan.Assignment, LayerExecutor)},
+     * except every queue between stages — including the front input queue
+     * and the back output queue — is capacity-bounded rather than unbounded,
+     * so a producer stage faster than its consumer genuinely blocks instead
+     * of growing that queue without limit. {@link #submit} already calls
+     * {@code put()}, which blocks correctly on a bounded queue for free; this
+     * constructor is the only thing needed to make that real.
+     *
+     * @param queueCapacity the capacity of every queue between stages; must be {@code >= 1}
+     */
+    public PipelineRunner(PipelineModel model, PipelinePlan.Assignment assignment, LayerExecutor executor,
+            int queueCapacity) {
         if (model == null) {
             throw new IllegalArgumentException("A pipeline runner needs a model");
         }
@@ -93,6 +119,10 @@ public final class PipelineRunner implements AutoCloseable {
         }
         if (executor == null) {
             throw new IllegalArgumentException("A pipeline runner needs an executor");
+        }
+        if (queueCapacity < 1) {
+            throw new IllegalArgumentException("A pipeline runner needs a queue capacity of at least 1, not "
+                    + queueCapacity);
         }
         int stageCount = model.stageCount();
         for (int i = 0; i < stageCount; i++) {
@@ -104,7 +134,7 @@ public final class PipelineRunner implements AutoCloseable {
 
         List<BlockingQueue<Object>> builtQueues = new ArrayList<>();
         for (int i = 0; i <= stageCount; i++) {
-            builtQueues.add(new LinkedBlockingQueue<>());
+            builtQueues.add(new LinkedBlockingQueue<>(queueCapacity));
         }
 
         List<ExecutorService> builtPools = new ArrayList<>();

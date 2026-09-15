@@ -16,7 +16,9 @@
  */
 package in.co.s13.sips.lib.ml.pipeline;
 
+import in.co.s13.sips.lib.array.Mat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -123,14 +125,40 @@ public final class PipelinePlan {
      * left over on the current throughput bottleneck. See the class
      * documentation for why this is two passes rather than one proportional
      * split.
+     *
+     * <p>Equivalent to calling the three-argument overload with an empty cost
+     * map, so every stage defaults to a uniform cost of {@code 1.0} — exactly
+     * this method's own implicit behaviour, which is why adding a cost model
+     * did not require a second copy of the algorithm.
      */
     public static Assignment assign(PipelineModel model, List<NodeCapacity> nodes) {
+        return assign(model, nodes, Map.of());
+    }
+
+    /**
+     * Same as {@link #assign(PipelineModel, List)}, except pass two picks the
+     * bottleneck stage by its actual items/second capacity —
+     * {@code totalAssignedSpeed / cost} — rather than by raw assigned node
+     * speed alone. A stage's cost is what it takes to run one item through
+     * it; two stages given identical nodes do not necessarily process items
+     * at the same rate, and node speed alone cannot tell them apart.
+     *
+     * @param stageCostMillis per-item cost in milliseconds, keyed by
+     *        {@link LayerGroup#name()}; a stage absent from this map (or a
+     *        {@code null} map entirely) defaults to {@code 1.0} — uniform
+     *        cost, i.e. today's behaviour when nothing has been measured yet.
+     *        Cost only matters relative to other stages' costs, so the unit
+     *        does not have to be milliseconds; {@link #measureStageCost} is
+     *        the intended source of a real value.
+     */
+    public static Assignment assign(PipelineModel model, List<NodeCapacity> nodes, Map<String, Double> stageCostMillis) {
         if (model == null) {
             throw new IllegalArgumentException("Pipeline assignment needs a model");
         }
         if (nodes == null || nodes.isEmpty()) {
             throw new IllegalArgumentException("Pipeline assignment needs at least one node");
         }
+        Map<String, Double> costs = stageCostMillis == null ? Map.of() : stageCostMillis;
 
         // Sorted, so the same cluster produces the same plan every run,
         // whatever order the caller's list happened to be in -- ShardPlan's
@@ -194,7 +222,7 @@ public final class PipelinePlan {
 
         while (!remaining.isEmpty()) {
             int bottleneckStage = -1;
-            double bottleneckSpeed = Double.MAX_VALUE;
+            double bottleneckCapacity = Double.MAX_VALUE;
             for (int i = 0; i < stageCount; i++) {
                 if (fastestWhere(eligibleByStage.get(i), remaining::contains) == null) {
                     // No remaining node is eligible for this stage; skip it in
@@ -205,8 +233,13 @@ public final class PipelinePlan {
                 for (String uuid : replicasByStage.get(i)) {
                     totalSpeed += byUuid.get(uuid).usableSpeed();
                 }
-                if (totalSpeed < bottleneckSpeed) {
-                    bottleneckSpeed = totalSpeed;
+                // Items/second, not raw node speed: a stage's cost is how
+                // much of that speed one item actually consumes, so two
+                // stages with identical assigned speed are not necessarily
+                // equally backed up.
+                double capacity = totalSpeed / costOf(model.stages().get(i), costs);
+                if (capacity < bottleneckCapacity) {
+                    bottleneckCapacity = capacity;
                     bottleneckStage = i;
                 }
             }
@@ -241,5 +274,64 @@ public final class PipelinePlan {
             }
         }
         return best;
+    }
+
+    /** A stage's declared or measured cost, or the uniform default of {@code 1.0} if it has neither. */
+    private static double costOf(LayerGroup stage, Map<String, Double> stageCostMillis) {
+        return stageCostMillis.getOrDefault(stage.name(), 1.0);
+    }
+
+    /**
+     * Measures one stage's own per-item cost, the missing input the class
+     * documentation calls out: {@code assign} can only weigh a stage's true
+     * bottleneck-ness against others if something actually times the stage,
+     * the same way {@code WorkerBench} times a node rather than asking it to
+     * guess its own speed.
+     *
+     * <p>{@code warmupRuns} pay for JIT warm-up and are discarded entirely —
+     * not even timed — before {@code measuredRuns} are individually timed
+     * with {@link System#nanoTime()}. The return value is the <em>median</em>
+     * of those timings, not the mean: a single slow outlier (a GC pause, a
+     * scheduler hiccup) should not move the estimate the way it would move an
+     * average, and a per-stage cost feeding a planner is exactly the kind of
+     * number one bad sample should not be allowed to distort. For an even
+     * {@code measuredRuns}, the median is the average of the two middle
+     * sorted samples.
+     *
+     * @param stage the stage to measure; not mutated by measurement
+     * @param sampleInput representative input, shaped the way real traffic
+     *        would shape it — the cost of a stage depends on what it is fed
+     * @param warmupRuns discarded runs before timing begins; must be {@code >= 0}
+     * @param measuredRuns timed runs the median is computed from; must be {@code >= 1}
+     * @return the median wall time of the measured runs, in milliseconds
+     */
+    public static double measureStageCost(LayerGroup stage, Mat sampleInput, int warmupRuns, int measuredRuns) {
+        if (stage == null) {
+            throw new IllegalArgumentException("Measuring a stage's cost needs the stage");
+        }
+        if (sampleInput == null) {
+            throw new IllegalArgumentException("Measuring a stage's cost needs a sample input");
+        }
+        if (warmupRuns < 0) {
+            throw new IllegalArgumentException("warmupRuns must not be negative, not " + warmupRuns);
+        }
+        if (measuredRuns < 1) {
+            throw new IllegalArgumentException("measuredRuns must be at least 1, not " + measuredRuns);
+        }
+
+        for (int i = 0; i < warmupRuns; i++) {
+            stage.forward(sampleInput);
+        }
+
+        double[] millis = new double[measuredRuns];
+        for (int i = 0; i < measuredRuns; i++) {
+            long start = System.nanoTime();
+            stage.forward(sampleInput);
+            millis[i] = (System.nanoTime() - start) / 1_000_000.0;
+        }
+
+        Arrays.sort(millis);
+        int mid = measuredRuns / 2;
+        return measuredRuns % 2 == 0 ? (millis[mid - 1] + millis[mid]) / 2.0 : millis[mid];
     }
 }

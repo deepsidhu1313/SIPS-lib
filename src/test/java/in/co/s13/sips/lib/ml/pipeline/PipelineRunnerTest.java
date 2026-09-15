@@ -18,15 +18,19 @@ package in.co.s13.sips.lib.ml.pipeline;
 
 import in.co.s13.sips.lib.array.Expr;
 import in.co.s13.sips.lib.array.Mat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -139,5 +143,89 @@ class PipelineRunnerTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> new PipelineRunner(model, onlyFirstStageAssigned, PipelineRunner.local()));
+    }
+
+    @Test
+    void aQueueCapacityBelowOneIsRefused() {
+        PipelineModel model = new PipelineModel(List.of(add1(), scale2()));
+        List<PipelinePlan.NodeCapacity> nodes = List.of(
+                new PipelinePlan.NodeCapacity("n1", 1024, 1.0),
+                new PipelinePlan.NodeCapacity("n2", 1024, 1.0));
+        PipelinePlan.Assignment assignment = PipelinePlan.assign(model, nodes);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new PipelineRunner(model, assignment, PipelineRunner.local(), 0));
+    }
+
+    @Test
+    void boundedQueueCapacityThrottlesAFastSubmitterBehindASlowStage() throws InterruptedException {
+        // n3 is far faster, so add1 (stage 0) gets it alone and scale2
+        // (stage 1) -- deliberately slowed down below -- gets both n1 and
+        // n2, the same shape as aTwoReplicaStageActuallyUsesBothReplicas.
+        // Two replicas draining one shared, bounded input queue is exactly
+        // the case where a bounded queue's poison re-queue (putOrInterrupt)
+        // has to rely on a sibling replica draining concurrently rather than
+        // deadlocking -- this test actually runs that, not just reasons
+        // about it.
+        PipelineModel model = new PipelineModel(List.of(add1(), scale2()));
+        List<PipelinePlan.NodeCapacity> nodes = List.of(
+                new PipelinePlan.NodeCapacity("n1", 1024, 1.0),
+                new PipelinePlan.NodeCapacity("n2", 1024, 1.0),
+                new PipelinePlan.NodeCapacity("n3", 1024, 10.0));
+        PipelinePlan.Assignment assignment = PipelinePlan.assign(model, nodes);
+        assertEquals(2, assignment.replicaCount(1), "test assumes scale2 gets two replicas");
+
+        PipelineRunner.LayerExecutor slowScale2 = (stage, nodeUuid, input) -> {
+            if (stage.name().equals("scale2")) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return stage.forward(input);
+        };
+
+        int itemCount = 20;
+        AtomicInteger submitted = new AtomicInteger(0);
+        List<Float> results = new ArrayList<>();
+
+        try (PipelineRunner runner = new PipelineRunner(model, assignment, slowScale2, 2)) {
+            Thread submitter = new Thread(() -> {
+                for (int i = 0; i < itemCount; i++) {
+                    runner.submit(one(i));
+                    submitted.incrementAndGet();
+                }
+            });
+            submitter.start();
+
+            // Nobody drains the output queue yet, and every queue between
+            // stages caps at 2, so no matter how long this waits, the
+            // submitter can never get all itemCount items in -- an
+            // unbounded queue would have accepted every one of them
+            // essentially instantly instead.
+            Thread.sleep(150);
+            assertTrue(submitted.get() < itemCount,
+                    "expected the bounded queues to have blocked the submitter by now, submitted="
+                            + submitted.get());
+
+            // Draining unblocks the backed-up pipeline; every item still
+            // arrives correctly. scale2 has two replicas here, so output
+            // order across them is not guaranteed -- compare as a multiset.
+            for (int i = 0; i < itemCount; i++) {
+                results.add(runner.take().at(0, 0));
+            }
+            submitter.join(5_000);
+            assertFalse(submitter.isAlive(), "submitter thread should have finished once fully drained");
+        }
+
+        List<Float> expected = new ArrayList<>();
+        for (int i = 0; i < itemCount; i++) {
+            expected.add((i + 1) * 2f);
+        }
+        Collections.sort(results);
+        Collections.sort(expected);
+        assertEquals(expected, results);
+        assertEquals(itemCount, submitted.get());
     }
 }

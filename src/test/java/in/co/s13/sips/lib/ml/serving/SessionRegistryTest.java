@@ -153,4 +153,63 @@ class SessionRegistryTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new SessionRegistry(Duration.ofMinutes(1), null));
     }
+
+    @Test
+    void updateStateAndStateForRoundTrip() {
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), new MutableClock(Instant.EPOCH));
+        sessions.pin("s1", "node-a");
+
+        sessions.updateState("s1", "kv-cache-ref-42");
+
+        assertEquals(Optional.of("kv-cache-ref-42"), sessions.stateFor("s1"));
+        // The pin itself is untouched by a state-only update.
+        assertEquals(Optional.of("node-a"), sessions.nodeFor("s1"));
+    }
+
+    @Test
+    void updateStateOnASessionThatNeverExistedThrows() {
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), new MutableClock(Instant.EPOCH));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> sessions.updateState("ghost", "some-state"));
+        assertTrue(thrown.getMessage().contains("ghost"), thrown.getMessage());
+    }
+
+    @Test
+    void pinPreservesExistingStateAcrossAReRepinToADifferentNode() {
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), new MutableClock(Instant.EPOCH));
+        sessions.pin("s1", "node-a");
+        sessions.updateState("s1", "conversation-history");
+
+        sessions.pin("s1", "node-b");
+
+        assertEquals(Optional.of("node-b"), sessions.nodeFor("s1"));
+        assertEquals(Optional.of("conversation-history"), sessions.stateFor("s1"));
+    }
+
+    @Test
+    void markUnavailableHidesTheNodeFromRoutingButNotTheState() {
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), new MutableClock(Instant.EPOCH));
+        sessions.pin("s1", "node-a");
+        sessions.updateState("s1", "conversation-history");
+
+        sessions.markUnavailable("node-a");
+
+        assertEquals(Optional.empty(), sessions.nodeFor("s1"));
+        assertEquals(Optional.of("conversation-history"), sessions.stateFor("s1"));
+    }
+
+    @Test
+    void markAvailableMakesAStillLiveSessionRoutableAgainWithoutReRepinning() {
+        MutableClock clock = new MutableClock(Instant.EPOCH);
+        SessionRegistry sessions = new SessionRegistry(Duration.ofMinutes(5), clock);
+        sessions.pin("s1", "node-a");
+        sessions.markUnavailable("node-a");
+        assertEquals(Optional.empty(), sessions.nodeFor("s1"));
+
+        clock.advance(Duration.ofMinutes(1));
+        sessions.markAvailable("node-a");
+
+        assertEquals(Optional.of("node-a"), sessions.nodeFor("s1"));
+    }
 }
